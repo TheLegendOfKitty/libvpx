@@ -163,7 +163,7 @@ add_proto qw/void vp9_fwht4x4/, "const int16_t *input, tran_low_t *output, int s
 specialize qw/vp9_fht4x4 sse2 neon/;
 specialize qw/vp9_fht8x8 sse2 neon/;
 specialize qw/vp9_fht16x16 sse2 neon/;
-specialize qw/vp9_fwht4x4 sse2/;
+specialize qw/vp9_fwht4x4 sse2 neon/;
 if (vpx_config("CONFIG_VP9_HIGHBITDEPTH") ne "yes") {
   # Note that these specializations are appended to the above ones.
   specialize qw/vp9_fht4x4 msa/;
@@ -206,13 +206,13 @@ if (vpx_config("CONFIG_REALTIME_ONLY") ne "yes") {
 
   if (vpx_config("CONFIG_VP9_HIGHBITDEPTH") eq "yes") {
     add_proto qw/void vpx_highbd_convolve12_vert/, "const uint16_t *src, ptrdiff_t src_stride, uint16_t *dst, ptrdiff_t dst_stride, const InterpKernel12 *filter, int x0_q4, int x_step_q4, int y0_q4, int y_step_q4, int w, int h, int bd";
-    specialize qw/vpx_highbd_convolve12_vert ssse3 avx2/;
+    specialize qw/vpx_highbd_convolve12_vert ssse3 avx2 neon/;
 
     add_proto qw/void vpx_highbd_convolve12_horiz/, "const uint16_t *src, ptrdiff_t src_stride, uint16_t *dst, ptrdiff_t dst_stride, const InterpKernel12 *filter, int x0_q4, int x_step_q4, int y0_q4, int y_step_q4, int w, int h, int bd";
-    specialize qw/vpx_highbd_convolve12_horiz ssse3 avx2/;
+    specialize qw/vpx_highbd_convolve12_horiz ssse3 avx2 neon/;
 
     add_proto qw/void vpx_highbd_convolve12/, "const uint16_t *src, ptrdiff_t src_stride, uint16_t *dst, ptrdiff_t dst_stride, const InterpKernel12 *filter, int x0_q4, int x_step_q4, int y0_q4, int y_step_q4, int w, int h, int bd";
-    specialize qw/vpx_highbd_convolve12 ssse3 avx2/;
+    specialize qw/vpx_highbd_convolve12 ssse3 avx2 neon/;
   }
 }
 
@@ -237,6 +237,7 @@ if (vpx_config("CONFIG_VP9_HIGHBITDEPTH") eq "yes") {
   specialize qw/vp9_highbd_fht16x16 neon/;
 
   add_proto qw/void vp9_highbd_fwht4x4/, "const int16_t *input, tran_low_t *output, int stride";
+  specialize qw/vp9_highbd_fwht4x4 neon/;
 
   add_proto qw/void vp9_highbd_temporal_filter_apply/, "const uint8_t *frame1, unsigned int stride, const uint8_t *frame2, unsigned int block_width, unsigned int block_height, int strength, int *blk_fw, int use_32x32, uint32_t *accumulator, uint16_t *count";
 

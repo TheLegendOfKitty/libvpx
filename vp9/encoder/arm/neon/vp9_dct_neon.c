@@ -2170,4 +2170,204 @@ void vp9_highbd_fht16x16_neon(const int16_t *input, tran_low_t *output,
   }
 }
 
+static INLINE void fwht4x4_neon(int16x4_t *input) {
+  // First pass: horizontal Walsh-Hadamard transform (column-wise)
+  // Process each column independently using scalar extraction
+  
+  // Column 0 - extract all values at once using scalar approach
+  int16_t a0 = vget_lane_s16(input[0], 0);
+  int16_t b0 = vget_lane_s16(input[1], 0);
+  int16_t c0 = vget_lane_s16(input[2], 0);
+  int16_t d0 = vget_lane_s16(input[3], 0);
+  
+  int16_t a_tmp = a0 + b0;
+  int16_t d_tmp = d0 - c0;
+  int16_t e_tmp = (a_tmp - d_tmp) >> 1;
+  int16_t b_tmp = e_tmp - b0;
+  int16_t c_tmp = e_tmp - c0;
+  a_tmp -= c_tmp;
+  d_tmp += b_tmp;
+  
+  input[0] = vset_lane_s16(a_tmp, input[0], 0);
+  input[1] = vset_lane_s16(c_tmp, input[1], 0);
+  input[2] = vset_lane_s16(d_tmp, input[2], 0);
+  input[3] = vset_lane_s16(b_tmp, input[3], 0);
+  
+  // Column 1
+  a0 = vget_lane_s16(input[0], 1);
+  b0 = vget_lane_s16(input[1], 1);
+  c0 = vget_lane_s16(input[2], 1);
+  d0 = vget_lane_s16(input[3], 1);
+  
+  a_tmp = a0 + b0;
+  d_tmp = d0 - c0;
+  e_tmp = (a_tmp - d_tmp) >> 1;
+  b_tmp = e_tmp - b0;
+  c_tmp = e_tmp - c0;
+  a_tmp -= c_tmp;
+  d_tmp += b_tmp;
+  
+  input[0] = vset_lane_s16(a_tmp, input[0], 1);
+  input[1] = vset_lane_s16(c_tmp, input[1], 1);
+  input[2] = vset_lane_s16(d_tmp, input[2], 1);
+  input[3] = vset_lane_s16(b_tmp, input[3], 1);
+  
+  // Column 2
+  a0 = vget_lane_s16(input[0], 2);
+  b0 = vget_lane_s16(input[1], 2);
+  c0 = vget_lane_s16(input[2], 2);
+  d0 = vget_lane_s16(input[3], 2);
+  
+  a_tmp = a0 + b0;
+  d_tmp = d0 - c0;
+  e_tmp = (a_tmp - d_tmp) >> 1;
+  b_tmp = e_tmp - b0;
+  c_tmp = e_tmp - c0;
+  a_tmp -= c_tmp;
+  d_tmp += b_tmp;
+  
+  input[0] = vset_lane_s16(a_tmp, input[0], 2);
+  input[1] = vset_lane_s16(c_tmp, input[1], 2);
+  input[2] = vset_lane_s16(d_tmp, input[2], 2);
+  input[3] = vset_lane_s16(b_tmp, input[3], 2);
+  
+  // Column 3
+  a0 = vget_lane_s16(input[0], 3);
+  b0 = vget_lane_s16(input[1], 3);
+  c0 = vget_lane_s16(input[2], 3);
+  d0 = vget_lane_s16(input[3], 3);
+  
+  a_tmp = a0 + b0;
+  d_tmp = d0 - c0;
+  e_tmp = (a_tmp - d_tmp) >> 1;
+  b_tmp = e_tmp - b0;
+  c_tmp = e_tmp - c0;
+  a_tmp -= c_tmp;
+  d_tmp += b_tmp;
+  
+  input[0] = vset_lane_s16(a_tmp, input[0], 3);
+  input[1] = vset_lane_s16(c_tmp, input[1], 3);
+  input[2] = vset_lane_s16(d_tmp, input[2], 3);
+  input[3] = vset_lane_s16(b_tmp, input[3], 3);
+
+  // Second pass: vertical Walsh-Hadamard transform with quantization (row-wise)
+  // Row 0
+  int16_t a = vget_lane_s16(input[0], 0);
+  int16_t b = vget_lane_s16(input[0], 1);
+  int16_t c = vget_lane_s16(input[0], 2);
+  int16_t d = vget_lane_s16(input[0], 3);
+  
+  int16_t a_new = a + b;
+  int16_t d_new = d - c;
+  int16_t e = (a_new - d_new) >> 1;
+  int16_t b_new = e - b;
+  int16_t c_new = e - c;
+  a_new -= c_new;
+  d_new += b_new;
+  
+  input[0] = vset_lane_s16(a_new * UNIT_QUANT_FACTOR, input[0], 0);
+  input[0] = vset_lane_s16(c_new * UNIT_QUANT_FACTOR, input[0], 1);
+  input[0] = vset_lane_s16(d_new * UNIT_QUANT_FACTOR, input[0], 2);
+  input[0] = vset_lane_s16(b_new * UNIT_QUANT_FACTOR, input[0], 3);
+  
+  // Row 1
+  a = vget_lane_s16(input[1], 0);
+  b = vget_lane_s16(input[1], 1);
+  c = vget_lane_s16(input[1], 2);
+  d = vget_lane_s16(input[1], 3);
+  
+  a_new = a + b;
+  d_new = d - c;
+  e = (a_new - d_new) >> 1;
+  b_new = e - b;
+  c_new = e - c;
+  a_new -= c_new;
+  d_new += b_new;
+  
+  input[1] = vset_lane_s16(a_new * UNIT_QUANT_FACTOR, input[1], 0);
+  input[1] = vset_lane_s16(c_new * UNIT_QUANT_FACTOR, input[1], 1);
+  input[1] = vset_lane_s16(d_new * UNIT_QUANT_FACTOR, input[1], 2);
+  input[1] = vset_lane_s16(b_new * UNIT_QUANT_FACTOR, input[1], 3);
+  
+  // Row 2
+  a = vget_lane_s16(input[2], 0);
+  b = vget_lane_s16(input[2], 1);
+  c = vget_lane_s16(input[2], 2);
+  d = vget_lane_s16(input[2], 3);
+  
+  a_new = a + b;
+  d_new = d - c;
+  e = (a_new - d_new) >> 1;
+  b_new = e - b;
+  c_new = e - c;
+  a_new -= c_new;
+  d_new += b_new;
+  
+  input[2] = vset_lane_s16(a_new * UNIT_QUANT_FACTOR, input[2], 0);
+  input[2] = vset_lane_s16(c_new * UNIT_QUANT_FACTOR, input[2], 1);
+  input[2] = vset_lane_s16(d_new * UNIT_QUANT_FACTOR, input[2], 2);
+  input[2] = vset_lane_s16(b_new * UNIT_QUANT_FACTOR, input[2], 3);
+  
+  // Row 3
+  a = vget_lane_s16(input[3], 0);
+  b = vget_lane_s16(input[3], 1);
+  c = vget_lane_s16(input[3], 2);
+  d = vget_lane_s16(input[3], 3);
+  
+  a_new = a + b;
+  d_new = d - c;
+  e = (a_new - d_new) >> 1;
+  b_new = e - b;
+  c_new = e - c;
+  a_new -= c_new;
+  d_new += b_new;
+  
+  input[3] = vset_lane_s16(a_new * UNIT_QUANT_FACTOR, input[3], 0);
+  input[3] = vset_lane_s16(c_new * UNIT_QUANT_FACTOR, input[3], 1);
+  input[3] = vset_lane_s16(d_new * UNIT_QUANT_FACTOR, input[3], 2);
+  input[3] = vset_lane_s16(b_new * UNIT_QUANT_FACTOR, input[3], 3);
+}
+
+void vp9_fwht4x4_neon(const int16_t *input, tran_low_t *output, int stride) {
+  // Load input data into NEON vectors
+  int16x4_t row0 = vld1_s16(input + 0 * stride);
+  int16x4_t row1 = vld1_s16(input + 1 * stride);
+  int16x4_t row2 = vld1_s16(input + 2 * stride);
+  int16x4_t row3 = vld1_s16(input + 3 * stride);
+  
+  int16x4_t rows[4] = {row0, row1, row2, row3};
+  
+  // Perform Walsh-Hadamard transform
+  fwht4x4_neon(rows);
+  
+  // Store results to output in linear order
+  output[0] = (tran_low_t)vget_lane_s16(rows[0], 0);
+  output[1] = (tran_low_t)vget_lane_s16(rows[0], 1);
+  output[2] = (tran_low_t)vget_lane_s16(rows[0], 2);
+  output[3] = (tran_low_t)vget_lane_s16(rows[0], 3);
+  
+  output[4] = (tran_low_t)vget_lane_s16(rows[1], 0);
+  output[5] = (tran_low_t)vget_lane_s16(rows[1], 1);
+  output[6] = (tran_low_t)vget_lane_s16(rows[1], 2);
+  output[7] = (tran_low_t)vget_lane_s16(rows[1], 3);
+  
+  output[8] = (tran_low_t)vget_lane_s16(rows[2], 0);
+  output[9] = (tran_low_t)vget_lane_s16(rows[2], 1);
+  output[10] = (tran_low_t)vget_lane_s16(rows[2], 2);
+  output[11] = (tran_low_t)vget_lane_s16(rows[2], 3);
+  
+  output[12] = (tran_low_t)vget_lane_s16(rows[3], 0);
+  output[13] = (tran_low_t)vget_lane_s16(rows[3], 1);
+  output[14] = (tran_low_t)vget_lane_s16(rows[3], 2);
+  output[15] = (tran_low_t)vget_lane_s16(rows[3], 3);
+}
+
+#if CONFIG_VP9_HIGHBITDEPTH
+void vp9_highbd_fwht4x4_neon(const int16_t *input, tran_low_t *output, int stride) {
+  // High bit depth version just calls the regular version
+  // since the input is already 16-bit and the algorithm is identical
+  vp9_fwht4x4_neon(input, output, stride);
+}
+#endif  // CONFIG_VP9_HIGHBITDEPTH
+
 #endif  // CONFIG_VP9_HIGHBITDEPTH

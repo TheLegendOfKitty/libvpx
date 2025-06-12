@@ -17,6 +17,32 @@
 #include "vp9/encoder/vp9_encoder.h"
 #include "vp9/encoder/vp9_temporal_filter.h"
 #include "vp9/encoder/vp9_temporal_filter_constants.h"
+#include "vpx_dsp/arm/mem_neon.h"
+
+// Helper functions for high bit-depth convolution
+static INLINE void load_u16_8x12(const uint16_t *s, uint16x8_t *s0, uint16x8_t *s1,
+                                  uint16x8_t *s2, uint16x8_t *s3, uint16x8_t *s4,
+                                  uint16x8_t *s5, uint16x8_t *s6, uint16x8_t *s7,
+                                  uint16x8_t *s8, uint16x8_t *s9, uint16x8_t *sA,
+                                  uint16x8_t *sB) {
+  *s0 = vld1q_u16(s + 0);
+  *s1 = vld1q_u16(s + 1);
+  *s2 = vld1q_u16(s + 2);
+  *s3 = vld1q_u16(s + 3);
+  *s4 = vld1q_u16(s + 4);
+  *s5 = vld1q_u16(s + 5);
+  *s6 = vld1q_u16(s + 6);
+  *s7 = vld1q_u16(s + 7);
+  *s8 = vld1q_u16(s + 8);
+  *s9 = vld1q_u16(s + 9);
+  *sA = vld1q_u16(s + 10);
+  *sB = vld1q_u16(s + 11);
+}
+
+static INLINE void store_u16_8x1(uint16_t *s, const uint16x8_t s0, int unused) {
+  (void)unused;
+  vst1q_u16(s, s0);
+}
 
 // Compute (a-b)**2 for 8 pixels with size 16-bit
 static INLINE void highbd_store_dist_8(const uint16_t *a, const uint16_t *b,
@@ -869,4 +895,233 @@ void vp9_highbd_apply_temporal_filter_neon(
       u_pre, v_pre, uv_pre_stride, block_width, block_height, ss_x, ss_y,
       strength, blk_fw, use_whole_blk, u_accum, u_count, v_accum, v_count,
       y_dist_ptr, u_dist_ptr, v_dist_ptr);
+}
+
+// High bit-depth 12-tap convolution functions
+
+static INLINE uint16x8_t highbd_convolve12_8(
+    const uint16x8_t s0, const uint16x8_t s1, const uint16x8_t s2,
+    const uint16x8_t s3, const uint16x8_t s4, const uint16x8_t s5,
+    const uint16x8_t s6, const uint16x8_t s7, const uint16x8_t s8,
+    const uint16x8_t s9, const uint16x8_t sA, const uint16x8_t sB,
+    const int16x8_t filter_0_7, const int16x4_t filter_8_11, int bd) {
+  const int16x4_t filter_0_3 = vget_low_s16(filter_0_7);
+  const int16x4_t filter_4_7 = vget_high_s16(filter_0_7);
+
+  // Use 32-bit intermediate arithmetic to prevent overflow
+  int32x4_t sum_lo = vmull_lane_s16(vget_low_s16(vreinterpretq_s16_u16(s0)), filter_0_3, 0);
+  int32x4_t sum_hi = vmull_lane_s16(vget_high_s16(vreinterpretq_s16_u16(s0)), filter_0_3, 0);
+  
+  sum_lo = vmlal_lane_s16(sum_lo, vget_low_s16(vreinterpretq_s16_u16(s1)), filter_0_3, 1);
+  sum_hi = vmlal_lane_s16(sum_hi, vget_high_s16(vreinterpretq_s16_u16(s1)), filter_0_3, 1);
+  
+  sum_lo = vmlal_lane_s16(sum_lo, vget_low_s16(vreinterpretq_s16_u16(s2)), filter_0_3, 2);
+  sum_hi = vmlal_lane_s16(sum_hi, vget_high_s16(vreinterpretq_s16_u16(s2)), filter_0_3, 2);
+  
+  sum_lo = vmlal_lane_s16(sum_lo, vget_low_s16(vreinterpretq_s16_u16(s3)), filter_0_3, 3);
+  sum_hi = vmlal_lane_s16(sum_hi, vget_high_s16(vreinterpretq_s16_u16(s3)), filter_0_3, 3);
+  
+  sum_lo = vmlal_lane_s16(sum_lo, vget_low_s16(vreinterpretq_s16_u16(s4)), filter_4_7, 0);
+  sum_hi = vmlal_lane_s16(sum_hi, vget_high_s16(vreinterpretq_s16_u16(s4)), filter_4_7, 0);
+  
+  sum_lo = vmlal_lane_s16(sum_lo, vget_low_s16(vreinterpretq_s16_u16(s5)), filter_4_7, 1);
+  sum_hi = vmlal_lane_s16(sum_hi, vget_high_s16(vreinterpretq_s16_u16(s5)), filter_4_7, 1);
+  
+  sum_lo = vmlal_lane_s16(sum_lo, vget_low_s16(vreinterpretq_s16_u16(s6)), filter_4_7, 2);
+  sum_hi = vmlal_lane_s16(sum_hi, vget_high_s16(vreinterpretq_s16_u16(s6)), filter_4_7, 2);
+  
+  sum_lo = vmlal_lane_s16(sum_lo, vget_low_s16(vreinterpretq_s16_u16(s7)), filter_4_7, 3);
+  sum_hi = vmlal_lane_s16(sum_hi, vget_high_s16(vreinterpretq_s16_u16(s7)), filter_4_7, 3);
+  
+  sum_lo = vmlal_lane_s16(sum_lo, vget_low_s16(vreinterpretq_s16_u16(s8)), filter_8_11, 0);
+  sum_hi = vmlal_lane_s16(sum_hi, vget_high_s16(vreinterpretq_s16_u16(s8)), filter_8_11, 0);
+  
+  sum_lo = vmlal_lane_s16(sum_lo, vget_low_s16(vreinterpretq_s16_u16(s9)), filter_8_11, 1);
+  sum_hi = vmlal_lane_s16(sum_hi, vget_high_s16(vreinterpretq_s16_u16(s9)), filter_8_11, 1);
+  
+  sum_lo = vmlal_lane_s16(sum_lo, vget_low_s16(vreinterpretq_s16_u16(sA)), filter_8_11, 2);
+  sum_hi = vmlal_lane_s16(sum_hi, vget_high_s16(vreinterpretq_s16_u16(sA)), filter_8_11, 2);
+  
+  sum_lo = vmlal_lane_s16(sum_lo, vget_low_s16(vreinterpretq_s16_u16(sB)), filter_8_11, 3);
+  sum_hi = vmlal_lane_s16(sum_hi, vget_high_s16(vreinterpretq_s16_u16(sB)), filter_8_11, 3);
+
+  // Round and clamp to bit depth
+  const uint16x4_t max_val = vdup_n_u16((1 << bd) - 1);
+  const uint16x8_t max_val_8 = vcombine_u16(max_val, max_val);
+  
+  uint16x4_t result_lo = vqrshrun_n_s32(sum_lo, FILTER_BITS);
+  uint16x4_t result_hi = vqrshrun_n_s32(sum_hi, FILTER_BITS);
+  
+  uint16x8_t result = vcombine_u16(result_lo, result_hi);
+  return vminq_u16(result, max_val_8);
+}
+
+void vpx_highbd_convolve12_horiz_neon(const uint16_t *src, ptrdiff_t src_stride,
+                                      uint16_t *dst, ptrdiff_t dst_stride,
+                                      const InterpKernel12 *filter, int x0_q4,
+                                      int x_step_q4, int y0_q4, int y_step_q4,
+                                      int w, int h, int bd) {
+  // Scaling not supported by NEON implementation
+  if (x_step_q4 != 16) {
+    vpx_highbd_convolve12_horiz_c(src, src_stride, dst, dst_stride, filter,
+                                  x0_q4, x_step_q4, y0_q4, y_step_q4, w, h, bd);
+    return;
+  }
+
+  assert(w == 32 || w == 16 || w == 8);
+  assert(h % 4 == 0);
+
+  const int16x8_t filter_0_7 = vld1q_s16(filter[x0_q4]);
+  const int16x4_t filter_8_11 = vld1_s16(filter[x0_q4] + 8);
+
+  src -= MAX_FILTER_TAP / 2 - 1;
+
+  do {
+    const uint16_t *s = src;
+    uint16_t *d = dst;
+    int width = w;
+
+    uint16x8_t t0, t1, t2, t3;
+
+    if (w == 8) {
+      load_u16_8x4(s, src_stride, &t0, &t1, &t2, &t3);
+      s += 8;
+
+      do {
+        uint16x8_t s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB;
+
+        s0 = t0;
+        s1 = t1;
+        s2 = t2;
+        s3 = t3;
+        load_u16_8x8(s, src_stride, &s4, &s5, &s6, &s7, &s8, &s9, &sA, &sB);
+
+        uint16x8_t d0 = highbd_convolve12_8(s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB,
+                                           filter_0_7, filter_8_11, bd);
+
+        store_u16_8x1(d, d0, 0);
+
+        t0 = s4;
+        t1 = s5;
+        t2 = s6;
+        t3 = s7;
+
+        s += src_stride;
+        d += dst_stride;
+      } while (--h != 0);
+    } else {
+      do {
+        uint16x8_t s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB;
+        load_u16_8x12(s, &s0, &s1, &s2, &s3, &s4, &s5, &s6, &s7, &s8, &s9, &sA, &sB);
+
+        uint16x8_t d0 = highbd_convolve12_8(s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB,
+                                           filter_0_7, filter_8_11, bd);
+        store_u16_8x1(d, d0, 0);
+
+        s += 8;
+        d += 8;
+        width -= 8;
+      } while (width != 0);
+
+      src += src_stride;
+      dst += dst_stride;
+    }
+  } while (--h != 0);
+}
+
+void vpx_highbd_convolve12_vert_neon(const uint16_t *src, ptrdiff_t src_stride,
+                                     uint16_t *dst, ptrdiff_t dst_stride,
+                                     const InterpKernel12 *filter, int x0_q4,
+                                     int x_step_q4, int y0_q4, int y_step_q4,
+                                     int w, int h, int bd) {
+  // Scaling not supported by NEON implementation
+  if (y_step_q4 != 16) {
+    vpx_highbd_convolve12_vert_c(src, src_stride, dst, dst_stride, filter,
+                                 x0_q4, x_step_q4, y0_q4, y_step_q4, w, h, bd);
+    return;
+  }
+
+  assert(w == 32 || w == 16 || w == 8);
+  assert(h % 4 == 0);
+
+  const int16x8_t filter_0_7 = vld1q_s16(filter[y0_q4]);
+  const int16x4_t filter_8_11 = vld1_s16(filter[y0_q4] + 8);
+
+  src -= src_stride * (MAX_FILTER_TAP / 2 - 1);
+
+  if (w == 8) {
+    uint16x8_t s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB;
+    load_u16_8x4(src, src_stride, &s0, &s1, &s2, &s3);
+    src += 4 * src_stride;
+
+    do {
+      load_u16_8x8(src, src_stride, &s4, &s5, &s6, &s7, &s8, &s9, &sA, &sB);
+
+      uint16x8_t d0 = highbd_convolve12_8(s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB,
+                                         filter_0_7, filter_8_11, bd);
+
+      store_u16_8x1(dst, d0, 0);
+
+      s0 = s4;
+      s1 = s5;
+      s2 = s6;
+      s3 = s7;
+
+      src += src_stride;
+      dst += dst_stride;
+    } while (--h != 0);
+  } else {
+    do {
+      const uint16_t *s = src;
+      uint16_t *d = dst;
+      int width = w;
+
+      do {
+        uint16x8_t s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB;
+        s0 = vld1q_u16(s + 0 * src_stride);
+        s1 = vld1q_u16(s + 1 * src_stride);
+        s2 = vld1q_u16(s + 2 * src_stride);
+        s3 = vld1q_u16(s + 3 * src_stride);
+        s4 = vld1q_u16(s + 4 * src_stride);
+        s5 = vld1q_u16(s + 5 * src_stride);
+        s6 = vld1q_u16(s + 6 * src_stride);
+        s7 = vld1q_u16(s + 7 * src_stride);
+        s8 = vld1q_u16(s + 8 * src_stride);
+        s9 = vld1q_u16(s + 9 * src_stride);
+        sA = vld1q_u16(s + 10 * src_stride);
+        sB = vld1q_u16(s + 11 * src_stride);
+
+        uint16x8_t d0 = highbd_convolve12_8(s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB,
+                                           filter_0_7, filter_8_11, bd);
+        store_u16_8x1(d, d0, 0);
+
+        s += 8;
+        d += 8;
+        width -= 8;
+      } while (width != 0);
+
+      src += src_stride;
+      dst += dst_stride;
+    } while (--h != 0);
+  }
+}
+
+void vpx_highbd_convolve12_neon(const uint16_t *src, ptrdiff_t src_stride,
+                                uint16_t *dst, ptrdiff_t dst_stride,
+                                const InterpKernel12 *filter, int x0_q4,
+                                int x_step_q4, int y0_q4, int y_step_q4,
+                                int w, int h, int bd) {
+  // Use the same approach as the C implementation: horizontal then vertical
+  uint16_t temp[32 * (32 + MAX_FILTER_TAP - 1)];  // BW * (BH + MAX_FILTER_TAP - 1)
+  const int temp_stride = 32;  // BW
+  const int intermediate_height = 
+      (((h - 1) * y_step_q4 + y0_q4) >> SUBPEL_BITS) + MAX_FILTER_TAP;
+
+  vpx_highbd_convolve12_horiz_neon(src - src_stride * (MAX_FILTER_TAP / 2 - 1),
+                                   src_stride, temp, temp_stride, filter, x0_q4,
+                                   x_step_q4, y0_q4, y_step_q4, w,
+                                   intermediate_height, bd);
+  vpx_highbd_convolve12_vert_neon(temp + temp_stride * (MAX_FILTER_TAP / 2 - 1),
+                                  temp_stride, dst, dst_stride, filter, x0_q4,
+                                  x_step_q4, y0_q4, y_step_q4, w, h, bd);
 }
