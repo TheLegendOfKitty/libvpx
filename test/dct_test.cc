@@ -686,6 +686,7 @@ INSTANTIATE_TEST_SUITE_P(
                                              sizeof(ht_neon_func_info[0]))),
         ::testing::Values(ht_neon_func_info), ::testing::Range(0, 4),
         ::testing::Values(VPX_BITS_8, VPX_BITS_10, VPX_BITS_12)));
+
 #endif  // HAVE_NEON
 
 #if HAVE_SSE2
@@ -787,5 +788,15 @@ INSTANTIATE_TEST_SUITE_P(VSX, TransWHT,
                          ::testing::Values(make_tuple(0, &wht_vsx_func_info, 0,
                                                       VPX_BITS_8)));
 #endif  // HAVE_VSX && !CONFIG_EMULATE_HARDWARE
+
+#if HAVE_NEON && !CONFIG_EMULATE_HARDWARE
+static const FuncInfo wht_neon_func_info = {
+  &fdct_wrapper<vp9_fwht4x4_c>, &idct_wrapper<vpx_iwht4x4_16_add_neon>, 4, 1
+};
+
+INSTANTIATE_TEST_SUITE_P(NEON, TransWHT,
+                         ::testing::Values(make_tuple(0, &wht_neon_func_info, 0,
+                                                      VPX_BITS_8)));
+#endif  // HAVE_NEON && !CONFIG_EMULATE_HARDWARE
 
 }  // namespace

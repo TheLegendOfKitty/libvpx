@@ -1969,6 +1969,10 @@ INSTANTIATE_TEST_SUITE_P(
                                 8)));
 
 #endif  // CONFIG_VP9_HIGHBITDEPTH
+
+INSTANTIATE_TEST_SUITE_P(NEON, SumOfSquaresTest,
+                         ::testing::Values(vpx_get_mb_ss_neon));
+
 #endif  // HAVE_NEON
 
 #if HAVE_SVE

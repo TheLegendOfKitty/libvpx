@@ -15,6 +15,7 @@
 #include "vpx_dsp/arm/idct_neon.h"
 #include "vpx_dsp/arm/mem_neon.h"
 #include "vpx_dsp/txfm_common.h"
+#include "vpx_dsp/vpx_dsp_common.h"
 
 void vpx_idct4x4_16_add_neon(const tran_low_t *input, uint8_t *dest,
                              int stride) {
@@ -56,4 +57,63 @@ void vpx_idct4x4_16_add_neon(const tran_low_t *input, uint8_t *dest,
   vst1_lane_u32((uint32_t *)dest, vreinterpret_u32_u8(d[1]), 1);
   dest += stride;
   vst1_lane_u32((uint32_t *)dest, vreinterpret_u32_u8(d[1]), 0);
+}
+
+void vpx_iwht4x4_16_add_neon(const tran_low_t *input, uint8_t *dest,
+                              int stride) {
+  int16_t output[16];
+  int16_t *op = output;
+  const tran_low_t *ip = input;
+  int i;
+
+  // First pass: horizontal 1-D Walsh-Hadamard transform on rows
+  // Process rows exactly like the C implementation
+  for (i = 0; i < 4; i++) {
+    int16_t a1 = ip[0] >> UNIT_QUANT_SHIFT;
+    int16_t c1 = ip[1] >> UNIT_QUANT_SHIFT; 
+    int16_t d1 = ip[2] >> UNIT_QUANT_SHIFT;
+    int16_t b1 = ip[3] >> UNIT_QUANT_SHIFT;
+    
+    a1 += c1;
+    d1 -= b1;
+    int16_t e1 = (a1 - d1) >> 1;
+    b1 = e1 - b1;
+    c1 = e1 - c1;
+    a1 -= b1;
+    d1 += c1;
+    
+    op[0] = a1;
+    op[1] = b1;
+    op[2] = c1;
+    op[3] = d1;
+    
+    ip += 4;
+    op += 4;
+  }
+
+  // Second pass: vertical 1-D Walsh-Hadamard transform on columns + add to dest
+  ip = output;
+  for (i = 0; i < 4; i++) {
+    int16_t a1 = ip[4 * 0];
+    int16_t c1 = ip[4 * 1];
+    int16_t d1 = ip[4 * 2];
+    int16_t b1 = ip[4 * 3];
+    
+    a1 += c1;
+    d1 -= b1;
+    int16_t e1 = (a1 - d1) >> 1;
+    b1 = e1 - b1;
+    c1 = e1 - c1;
+    a1 -= b1;
+    d1 += c1;
+    
+    // Add to destination with pixel clamping
+    dest[stride * 0] = clip_pixel(dest[stride * 0] + a1);
+    dest[stride * 1] = clip_pixel(dest[stride * 1] + b1);
+    dest[stride * 2] = clip_pixel(dest[stride * 2] + c1);
+    dest[stride * 3] = clip_pixel(dest[stride * 3] + d1);
+    
+    ip++;
+    dest++;
+  }
 }

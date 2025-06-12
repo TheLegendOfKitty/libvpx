@@ -329,4 +329,20 @@ VPX_MSE_WXH_NEON(8, 16)
 VPX_MSE_WXH_NEON(16, 8)
 VPX_MSE_WXH_NEON(16, 16)
 
+uint32_t vpx_get_mb_ss_neon(const int16_t *src_ptr) {
+  uint32x4_t sum_s32 = vdupq_n_u32(0);
+  int i;
+
+  for (i = 0; i < 32; ++i) {
+    const int16x8_t s = vld1q_s16(src_ptr);
+    const uint32x4_t square_lo = vreinterpretq_u32_s32(vmull_s16(vget_low_s16(s), vget_low_s16(s)));
+    const uint32x4_t square_hi = vreinterpretq_u32_s32(vmull_s16(vget_high_s16(s), vget_high_s16(s)));
+    sum_s32 = vaddq_u32(sum_s32, square_lo);
+    sum_s32 = vaddq_u32(sum_s32, square_hi);
+    src_ptr += 8;
+  }
+
+  return (uint32_t)horizontal_long_add_uint32x4(sum_s32);
+}
+
 #undef VPX_MSE_WXH_NEON
