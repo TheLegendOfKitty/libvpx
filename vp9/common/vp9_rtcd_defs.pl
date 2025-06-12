@@ -53,10 +53,10 @@ if ($opts{arch} eq "x86_64") {
 #
 if (vpx_config("CONFIG_VP9_POSTPROC") eq "yes") {
 add_proto qw/void vp9_filter_by_weight16x16/, "const uint8_t *src, int src_stride, uint8_t *dst, int dst_stride, int src_weight";
-specialize qw/vp9_filter_by_weight16x16 sse2 msa/;
+specialize qw/vp9_filter_by_weight16x16 sse2 msa neon/;
 
 add_proto qw/void vp9_filter_by_weight8x8/, "const uint8_t *src, int src_stride, uint8_t *dst, int dst_stride, int src_weight";
-specialize qw/vp9_filter_by_weight8x8 sse2 msa/;
+specialize qw/vp9_filter_by_weight8x8 sse2 msa neon/;
 }
 
 #

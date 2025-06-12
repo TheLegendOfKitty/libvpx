@@ -80,6 +80,7 @@ VP9_COMMON_SRCS-$(HAVE_NEON)  += common/arm/neon/vp9_iht_neon.h
 
 ifeq ($(CONFIG_VP9_POSTPROC),yes)
 VP9_COMMON_SRCS-$(HAVE_MSA)  += common/mips/msa/vp9_mfqe_msa.c
+VP9_COMMON_SRCS-$(HAVE_NEON) += common/arm/neon/vp9_mfqe_neon.c
 VP9_COMMON_SRCS-$(HAVE_SSE2) += common/x86/vp9_mfqe_sse2.asm
 endif
 
