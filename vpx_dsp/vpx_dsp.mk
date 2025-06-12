@@ -98,6 +98,7 @@ DSP_SRCS-$(VPX_ARCH_X86)$(VPX_ARCH_X86_64) += x86/convolve.h
 DSP_SRCS-$(HAVE_SSE2) += x86/convolve_sse2.h
 DSP_SRCS-$(HAVE_SSSE3) += x86/convolve_ssse3.h
 DSP_SRCS-$(HAVE_AVX2) += x86/convolve_avx2.h
+DSP_SRCS-$(HAVE_AVX512) += x86/convolve_avx512.c
 DSP_SRCS-$(HAVE_SSE2)  += x86/vpx_subpixel_8t_sse2.asm
 DSP_SRCS-$(HAVE_SSE2)  += x86/vpx_subpixel_4t_intrin_sse2.c
 DSP_SRCS-$(HAVE_SSE2)  += x86/vpx_subpixel_bilinear_sse2.asm
