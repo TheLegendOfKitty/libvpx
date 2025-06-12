@@ -455,6 +455,7 @@ DSP_SRCS-$(HAVE_AVX512) += x86/highbd_convolve_avx512.c
 DSP_SRCS-$(HAVE_AVX512) += x86/highbd_variance_avx512.c
 DSP_SRCS-$(HAVE_AVX512) += x86/highbd_sad_avx512.c
 DSP_SRCS-$(HAVE_AVX512) += x86/vpx_scaled_convolve_avx512.c
+DSP_SRCS-$(HAVE_AVX512) += x86/vpx_convolve12_avx512.c
 DSP_SRCS-$(HAVE_VSX)    += ppc/variance_vsx.c
 
 ifeq ($(VPX_ARCH_X86_64),yes)

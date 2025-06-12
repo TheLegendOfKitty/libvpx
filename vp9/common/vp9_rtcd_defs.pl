@@ -141,10 +141,10 @@ specialize qw/vp9_quantize_fp_32x32 neon ssse3 avx2 $avx512_x86_64 vsx/;
 
 # RD optimization functions
 add_proto qw/uint64_t vp9_sum_squares_2d/, "const int16_t *src, int src_stride, int size";
-specialize qw/vp9_sum_squares_2d neon/;
+specialize qw/vp9_sum_squares_2d neon $avx512_x86_64/;
 
 add_proto qw/uint64_t vp9_block_diff_sse/, "const uint8_t *src, int src_stride, const uint8_t *pred, int pred_stride, int block_size";
-specialize qw/vp9_block_diff_sse neon/;
+specialize qw/vp9_block_diff_sse neon $avx512_x86_64/;
 
 if (vpx_config("CONFIG_VP9_HIGHBITDEPTH") eq "yes") {
   specialize qw/vp9_block_error neon sve avx2 sse2/;
@@ -167,9 +167,9 @@ add_proto qw/void vp9_fwht4x4/, "const int16_t *input, tran_low_t *output, int s
 
 # Note that there are more specializations appended when CONFIG_VP9_HIGHBITDEPTH
 # is off.
-specialize qw/vp9_fht4x4 sse2 neon/;
-specialize qw/vp9_fht8x8 sse2 neon/;
-specialize qw/vp9_fht16x16 sse2 neon/;
+specialize qw/vp9_fht4x4 sse2 neon $avx512_x86_64/;
+specialize qw/vp9_fht8x8 sse2 neon $avx512_x86_64/;
+specialize qw/vp9_fht16x16 sse2 neon $avx512_x86_64/;
 specialize qw/vp9_fwht4x4 sse2 neon/;
 if (vpx_config("CONFIG_VP9_HIGHBITDEPTH") ne "yes") {
   # Note that these specializations are appended to the above ones.
@@ -183,7 +183,7 @@ if (vpx_config("CONFIG_VP9_HIGHBITDEPTH") ne "yes") {
 # Motion search
 #
 add_proto qw/int vp9_diamond_search_sad/, "const struct macroblock *x, const struct search_site_config *cfg,  struct mv *ref_mv, uint32_t start_mv_sad, struct mv *best_mv, int search_param, int sad_per_bit, int *num00, const struct vp9_sad_table *sad_fn_ptr, const struct mv *center_mv";
-specialize qw/vp9_diamond_search_sad neon/;
+specialize qw/vp9_diamond_search_sad neon $avx512_x86_64/;
 
 #
 # Apply temporal filter
@@ -203,23 +203,23 @@ specialize qw/vp9_apply_temporal_filter sse4_1 neon/;
 #
 if (vpx_config("CONFIG_REALTIME_ONLY") ne "yes") {
   add_proto qw/void vpx_convolve12_vert/, "const uint8_t *src, ptrdiff_t src_stride, uint8_t *dst, ptrdiff_t dst_stride, const InterpKernel12 *filter, int x0_q4, int x_step_q4, int y0_q4, int y_step_q4, int w, int h";
-  specialize qw/vpx_convolve12_vert ssse3 avx2 neon neon_dotprod neon_i8mm/;
+  specialize qw/vpx_convolve12_vert ssse3 avx2 $avx512_x86_64 neon neon_dotprod neon_i8mm/;
 
   add_proto qw/void vpx_convolve12_horiz/, "const uint8_t *src, ptrdiff_t src_stride, uint8_t *dst, ptrdiff_t dst_stride, const InterpKernel12 *filter, int x0_q4, int x_step_q4, int y0_q4, int y_step_q4, int w, int h";
-  specialize qw/vpx_convolve12_horiz ssse3 avx2 neon neon_dotprod neon_i8mm/;
+  specialize qw/vpx_convolve12_horiz ssse3 avx2 $avx512_x86_64 neon neon_dotprod neon_i8mm/;
 
   add_proto qw/void vpx_convolve12/, "const uint8_t *src, ptrdiff_t src_stride, uint8_t *dst, ptrdiff_t dst_stride, const InterpKernel12 *filter, int x0_q4, int x_step_q4, int y0_q4, int y_step_q4, int w, int h";
-  specialize qw/vpx_convolve12 ssse3 avx2 neon neon_dotprod neon_i8mm/;
+  specialize qw/vpx_convolve12 ssse3 avx2 $avx512_x86_64 neon neon_dotprod neon_i8mm/;
 
   if (vpx_config("CONFIG_VP9_HIGHBITDEPTH") eq "yes") {
     add_proto qw/void vpx_highbd_convolve12_vert/, "const uint16_t *src, ptrdiff_t src_stride, uint16_t *dst, ptrdiff_t dst_stride, const InterpKernel12 *filter, int x0_q4, int x_step_q4, int y0_q4, int y_step_q4, int w, int h, int bd";
-    specialize qw/vpx_highbd_convolve12_vert ssse3 avx2 neon/;
+    specialize qw/vpx_highbd_convolve12_vert ssse3 avx2 $avx512_x86_64 neon/;
 
     add_proto qw/void vpx_highbd_convolve12_horiz/, "const uint16_t *src, ptrdiff_t src_stride, uint16_t *dst, ptrdiff_t dst_stride, const InterpKernel12 *filter, int x0_q4, int x_step_q4, int y0_q4, int y_step_q4, int w, int h, int bd";
-    specialize qw/vpx_highbd_convolve12_horiz ssse3 avx2 neon/;
+    specialize qw/vpx_highbd_convolve12_horiz ssse3 avx2 $avx512_x86_64 neon/;
 
     add_proto qw/void vpx_highbd_convolve12/, "const uint16_t *src, ptrdiff_t src_stride, uint16_t *dst, ptrdiff_t dst_stride, const InterpKernel12 *filter, int x0_q4, int x_step_q4, int y0_q4, int y_step_q4, int w, int h, int bd";
-    specialize qw/vpx_highbd_convolve12 ssse3 avx2 neon/;
+    specialize qw/vpx_highbd_convolve12 ssse3 avx2 $avx512_x86_64 neon/;
   }
 }
 
@@ -255,7 +255,7 @@ if (vpx_config("CONFIG_VP9_HIGHBITDEPTH") eq "yes") {
 # frame based scale
 #
 add_proto qw/void vp9_scale_and_extend_frame/, "const struct yv12_buffer_config *src, struct yv12_buffer_config *dst, INTERP_FILTER filter_type, int phase_scaler";
-specialize qw/vp9_scale_and_extend_frame neon ssse3/;
+specialize qw/vp9_scale_and_extend_frame neon ssse3 $avx512_x86_64/;
 
 }
 # end encoder functions
