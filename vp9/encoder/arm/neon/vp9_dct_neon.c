@@ -2170,6 +2170,8 @@ void vp9_highbd_fht16x16_neon(const int16_t *input, tran_low_t *output,
   }
 }
 
+#endif  // CONFIG_VP9_HIGHBITDEPTH
+
 static INLINE void fwht4x4_neon(int16x4_t *input) {
   // First pass: horizontal Walsh-Hadamard transform (column-wise)
   // Process each column independently using scalar extraction
@@ -2368,6 +2370,4 @@ void vp9_highbd_fwht4x4_neon(const int16_t *input, tran_low_t *output, int strid
   // since the input is already 16-bit and the algorithm is identical
   vp9_fwht4x4_neon(input, output, stride);
 }
-#endif  // CONFIG_VP9_HIGHBITDEPTH
-
 #endif  // CONFIG_VP9_HIGHBITDEPTH

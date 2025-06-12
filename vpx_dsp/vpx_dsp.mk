@@ -104,6 +104,7 @@ DSP_SRCS-$(HAVE_SSE2)  += x86/vpx_subpixel_bilinear_sse2.asm
 DSP_SRCS-$(HAVE_SSSE3) += x86/vpx_subpixel_8t_ssse3.asm
 DSP_SRCS-$(HAVE_SSSE3) += x86/vpx_subpixel_bilinear_ssse3.asm
 DSP_SRCS-$(HAVE_AVX2)  += x86/vpx_subpixel_8t_intrin_avx2.c
+DSP_SRCS-$(HAVE_AVX512) += x86/vpx_subpixel_8t_intrin_avx512.c
 DSP_SRCS-$(HAVE_SSSE3) += x86/vpx_subpixel_8t_intrin_ssse3.c
 ifeq ($(CONFIG_VP9_HIGHBITDEPTH),yes)
 DSP_SRCS-$(HAVE_SSE2)  += x86/vpx_high_subpixel_8t_sse2.asm
@@ -248,6 +249,7 @@ DSP_SRCS-$(HAVE_LSX)    += loongarch/fwd_txfm_lsx.c
 
 ifneq ($(CONFIG_VP9_HIGHBITDEPTH),yes)
 DSP_SRCS-$(HAVE_AVX2)   += x86/fwd_txfm_avx2.c
+DSP_SRCS-$(HAVE_AVX512) += x86/fwd_txfm_avx512.c
 DSP_SRCS-$(HAVE_MSA)    += mips/fwd_dct32x32_msa.c
 DSP_SRCS-$(HAVE_LSX)    += loongarch/fwd_dct32x32_lsx.c
 endif  # !CONFIG_VP9_HIGHBITDEPTH
@@ -262,6 +264,7 @@ DSP_SRCS-yes            += inv_txfm.c
 DSP_SRCS-$(HAVE_SSE2)   += x86/inv_txfm_sse2.h
 DSP_SRCS-$(HAVE_SSE2)   += x86/inv_txfm_sse2.c
 DSP_SRCS-$(HAVE_AVX2)   += x86/inv_txfm_avx2.c
+DSP_SRCS-$(HAVE_AVX512) += x86/inv_txfm_avx512.c
 DSP_SRCS-$(HAVE_SSE2)   += x86/inv_wht_sse2.asm
 DSP_SRCS-$(HAVE_SSSE3)  += x86/inv_txfm_ssse3.h
 DSP_SRCS-$(HAVE_SSSE3)  += x86/inv_txfm_ssse3.c
@@ -343,6 +346,7 @@ DSP_SRCS-$(HAVE_LSX)    += loongarch/quantize_lsx.c
 ifeq ($(CONFIG_VP9_HIGHBITDEPTH),yes)
 DSP_SRCS-$(HAVE_SSE2)   += x86/highbd_quantize_intrin_sse2.c
 DSP_SRCS-$(HAVE_AVX2)   += x86/highbd_quantize_intrin_avx2.c
+DSP_SRCS-$(HAVE_AVX512) += x86/highbd_quantize_intrin_avx512.c
 DSP_SRCS-$(HAVE_NEON)   += arm/highbd_quantize_neon.c
 endif
 
@@ -441,6 +445,7 @@ DSP_SRCS-$(HAVE_SSE2)   += x86/avg_pred_sse2.c
 DSP_SRCS-$(HAVE_AVX2)   += x86/avg_pred_avx2.c
 DSP_SRCS-$(HAVE_SSE2)   += x86/variance_sse2.c  # Contains SSE2 and SSSE3
 DSP_SRCS-$(HAVE_AVX2)   += x86/variance_avx2.c
+DSP_SRCS-$(HAVE_AVX512) += x86/variance_avx512.c
 DSP_SRCS-$(HAVE_VSX)    += ppc/variance_vsx.c
 
 ifeq ($(VPX_ARCH_X86_64),yes)

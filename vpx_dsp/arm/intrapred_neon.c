@@ -1939,4 +1939,132 @@ void vpx_tm_predictor_32x32_neon(uint8_t *dst, ptrdiff_t stride,
     }
   }
 }
+
+//------------------------------------------------------------------------------
+// Edge predictors
+
+void vpx_d45e_predictor_4x4_neon(uint8_t *dst, ptrdiff_t stride,
+                                 const uint8_t *above, const uint8_t *left) {
+  uint8x8_t a0, a1, a2, d0, d1, d2, d3;
+  (void)left;
+
+  // Load above[0..7]
+  a0 = vld1_u8(above);
+  // [ above[1], above[2], above[3], above[4], above[5], above[6], above[7], x ]
+  a1 = vext_u8(a0, a0, 1);
+  // [ above[2], above[3], above[4], above[5], above[6], above[7], x, x ]
+  a2 = vext_u8(a0, a0, 2);
+
+  // d0[0] = AVG3(above[0], above[1], above[2]);
+  // d0[1] = AVG3(above[1], above[2], above[3]);
+  // d0[2] = AVG3(above[2], above[3], above[4]);
+  // d0[3] = AVG3(above[3], above[4], above[5]);
+  d0 = vrhadd_u8(vhadd_u8(a0, a2), a1);
+
+  // d1[0] = AVG3(above[1], above[2], above[3]);
+  // d1[1] = AVG3(above[2], above[3], above[4]);
+  // d1[2] = AVG3(above[3], above[4], above[5]);
+  // d1[3] = AVG3(above[4], above[5], above[6]);
+  d1 = vext_u8(d0, d0, 1);
+
+  // d2[0] = AVG3(above[2], above[3], above[4]);
+  // d2[1] = AVG3(above[3], above[4], above[5]);
+  // d2[2] = AVG3(above[4], above[5], above[6]);
+  // d2[3] = AVG3(above[5], above[6], above[7]);
+  d2 = vext_u8(d0, d0, 2);
+
+  // d3[0] = AVG3(above[3], above[4], above[5]);
+  // d3[1] = AVG3(above[4], above[5], above[6]);
+  // d3[2] = AVG3(above[5], above[6], above[7]);
+  // d3[3] = AVG3(above[6], above[7], above[7]);
+  d3 = vext_u8(d0, d0, 3);
+  // Fix the last element to handle above[7], above[7] case
+  d3 = vset_lane_u8((vget_lane_u8(a0, 6) + 2*vget_lane_u8(a0, 7) + vget_lane_u8(a0, 7) + 2) >> 2, d3, 3);
+
+  // Store rows
+  vst1_lane_u32((uint32_t *)dst, vreinterpret_u32_u8(d0), 0);
+  dst += stride;
+  vst1_lane_u32((uint32_t *)dst, vreinterpret_u32_u8(d1), 0);
+  dst += stride;
+  vst1_lane_u32((uint32_t *)dst, vreinterpret_u32_u8(d2), 0);
+  dst += stride;
+  vst1_lane_u32((uint32_t *)dst, vreinterpret_u32_u8(d3), 0);
+}
+
+void vpx_d63e_predictor_4x4_neon(uint8_t *dst, ptrdiff_t stride,
+                                 const uint8_t *above, const uint8_t *left) {
+  const uint8_t A = above[0];
+  const uint8_t B = above[1];
+  const uint8_t C = above[2];
+  const uint8_t D = above[3];
+  const uint8_t E = above[4];
+  const uint8_t F = above[5];
+  const uint8_t G = above[6];
+  uint8_t avg2_vals[8], avg3_vals[8];
+  (void)left;
+
+  // Calculate AVG2 values
+  avg2_vals[0] = (A + B + 1) >> 1;  // AVG2(A,B)
+  avg2_vals[1] = (B + C + 1) >> 1;  // AVG2(B,C)
+  avg2_vals[2] = (C + D + 1) >> 1;  // AVG2(C,D)
+  avg2_vals[3] = (D + E + 1) >> 1;  // AVG2(D,E)
+
+  // Calculate AVG3 values
+  avg3_vals[0] = (A + 2*B + C + 2) >> 2;  // AVG3(A,B,C)
+  avg3_vals[1] = (B + 2*C + D + 2) >> 2;  // AVG3(B,C,D)
+  avg3_vals[2] = (C + 2*D + E + 2) >> 2;  // AVG3(C,D,E)
+  avg3_vals[3] = (D + 2*E + F + 2) >> 2;  // AVG3(D,E,F)
+  avg3_vals[4] = (E + 2*F + G + 2) >> 2;  // AVG3(E,F,G)
+
+  // Build rows according to C implementation pattern
+  // Row 0: AVG2(A,B), AVG2(B,C), AVG2(C,D), AVG2(D,E)
+  dst[0] = avg2_vals[0];
+  dst[1] = avg2_vals[1];
+  dst[2] = avg2_vals[2];
+  dst[3] = avg2_vals[3];
+  dst += stride;
+
+  // Row 1: AVG3(A,B,C), AVG3(B,C,D), AVG3(C,D,E), AVG3(D,E,F)
+  dst[0] = avg3_vals[0];
+  dst[1] = avg3_vals[1];
+  dst[2] = avg3_vals[2];
+  dst[3] = avg3_vals[3];
+  dst += stride;
+
+  // Row 2: AVG2(B,C), AVG2(C,D), AVG2(D,E), AVG3(E,F,G)
+  dst[0] = avg2_vals[1];
+  dst[1] = avg2_vals[2];
+  dst[2] = avg2_vals[3];
+  dst[3] = avg3_vals[4];
+  dst += stride;
+
+  // Row 3: AVG3(B,C,D), AVG3(C,D,E), AVG3(D,E,F), AVG3(E,F,G)
+  dst[0] = avg3_vals[1];
+  dst[1] = avg3_vals[2];
+  dst[2] = avg3_vals[3];
+  dst[3] = avg3_vals[4];
+}
+
+void vpx_he_predictor_4x4_neon(uint8_t *dst, ptrdiff_t stride,
+                               const uint8_t *above, const uint8_t *left) {
+  const uint8_t H = above[-1];
+  const uint8_t I = left[0];
+  const uint8_t J = left[1];
+  const uint8_t K = left[2];
+  const uint8_t L = left[3];
+  uint8_t d0, d1, d2, d3;
+
+  // Calculate AVG3 for each row using the standard formula: (a + 2*b + c + 2) >> 2
+  d0 = (H + 2*I + J + 2) >> 2;        // AVG3(H, I, J)
+  d1 = (I + 2*J + K + 2) >> 2;        // AVG3(I, J, K)
+  d2 = (J + 2*K + L + 2) >> 2;        // AVG3(J, K, L)
+  d3 = (K + 2*L + L + 2) >> 2;        // AVG3(K, L, L)
+
+  // Replicate each value across the row
+  memset(dst, d0, 4); dst += stride;
+  memset(dst, d1, 4); dst += stride;
+  memset(dst, d2, 4); dst += stride;
+  memset(dst, d3, 4);
+}
+
 #endif  // !HAVE_NEON_ASM
