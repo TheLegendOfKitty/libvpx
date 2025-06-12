@@ -427,3 +427,218 @@ unsigned int vpx_sub_pixel_variance16x16_avx512(const uint8_t *src,
                                          ref, ref_stride, sse);
   }
 }
+
+// Additional variance functions for missing block sizes
+unsigned int vpx_variance8x16_avx512(const uint8_t *src_ptr, int src_stride,
+                                     const uint8_t *ref_ptr, int ref_stride,
+                                     unsigned int *sse) {
+  __m512i sum_sse = _mm512_setzero_si512();
+  __m512i sum_diff = _mm512_setzero_si512();
+  
+  for (int i = 0; i < 16; ++i) {
+    // Load 8 bytes from source and reference
+    const __m128i src = _mm_loadl_epi64((const __m128i *)(src_ptr + i * src_stride));
+    const __m128i ref = _mm_loadl_epi64((const __m128i *)(ref_ptr + i * ref_stride));
+    
+    // Use SAD for efficient difference calculation
+    const __m512i src_512 = _mm512_castsi128_si512(src);
+    const __m512i ref_512 = _mm512_castsi128_si512(ref);
+    
+    // Calculate SAD and accumulate
+    sum_diff = _mm512_add_epi64(sum_diff, _mm512_sad_epu8(src_512, ref_512));
+    
+    // Calculate SSE
+    const __m512i src_16 = _mm512_cvtepu8_epi16(_mm256_castsi128_si256(src));
+    const __m512i ref_16 = _mm512_cvtepu8_epi16(_mm256_castsi128_si256(ref));
+    const __m512i diff = _mm512_sub_epi16(src_16, ref_16);
+    const __m512i squared = _mm512_mullo_epi16(diff, diff);
+    
+    const __m512i squared_lo = _mm512_unpacklo_epi16(squared, _mm512_setzero_si512());
+    sum_sse = _mm512_add_epi32(sum_sse, squared_lo);
+  }
+  
+  const int64_t sum = _mm512_reduce_add_epi64(sum_diff);
+  *sse = _mm512_reduce_add_epi32(sum_sse);
+  
+  return *sse - (unsigned int)(((int64_t)sum * sum) >> 7);  // Divide by 128
+}
+
+unsigned int vpx_variance8x8_avx512(const uint8_t *src_ptr, int src_stride,
+                                    const uint8_t *ref_ptr, int ref_stride,
+                                    unsigned int *sse) {
+  __m512i sum_sse = _mm512_setzero_si512();
+  __m512i sum_diff = _mm512_setzero_si512();
+  
+  for (int i = 0; i < 8; ++i) {
+    // Load 8 bytes from source and reference
+    const __m128i src = _mm_loadl_epi64((const __m128i *)(src_ptr + i * src_stride));
+    const __m128i ref = _mm_loadl_epi64((const __m128i *)(ref_ptr + i * ref_stride));
+    
+    // Use SAD for efficient difference calculation
+    const __m512i src_512 = _mm512_castsi128_si512(src);
+    const __m512i ref_512 = _mm512_castsi128_si512(ref);
+    
+    // Calculate SAD and accumulate
+    sum_diff = _mm512_add_epi64(sum_diff, _mm512_sad_epu8(src_512, ref_512));
+    
+    // Calculate SSE
+    const __m512i src_16 = _mm512_cvtepu8_epi16(_mm256_castsi128_si256(src));
+    const __m512i ref_16 = _mm512_cvtepu8_epi16(_mm256_castsi128_si256(ref));
+    const __m512i diff = _mm512_sub_epi16(src_16, ref_16);
+    const __m512i squared = _mm512_mullo_epi16(diff, diff);
+    
+    const __m512i squared_lo = _mm512_unpacklo_epi16(squared, _mm512_setzero_si512());
+    sum_sse = _mm512_add_epi32(sum_sse, squared_lo);
+  }
+  
+  const int64_t sum = _mm512_reduce_add_epi64(sum_diff);
+  *sse = _mm512_reduce_add_epi32(sum_sse);
+  
+  return *sse - (unsigned int)(((int64_t)sum * sum) >> 6);  // Divide by 64
+}
+
+unsigned int vpx_variance8x4_avx512(const uint8_t *src_ptr, int src_stride,
+                                    const uint8_t *ref_ptr, int ref_stride,
+                                    unsigned int *sse) {
+  __m512i sum_sse = _mm512_setzero_si512();
+  __m512i sum_diff = _mm512_setzero_si512();
+  
+  for (int i = 0; i < 4; ++i) {
+    // Load 8 bytes from source and reference
+    const __m128i src = _mm_loadl_epi64((const __m128i *)(src_ptr + i * src_stride));
+    const __m128i ref = _mm_loadl_epi64((const __m128i *)(ref_ptr + i * ref_stride));
+    
+    // Use SAD for efficient difference calculation
+    const __m512i src_512 = _mm512_castsi128_si512(src);
+    const __m512i ref_512 = _mm512_castsi128_si512(ref);
+    
+    // Calculate SAD and accumulate
+    sum_diff = _mm512_add_epi64(sum_diff, _mm512_sad_epu8(src_512, ref_512));
+    
+    // Calculate SSE
+    const __m512i src_16 = _mm512_cvtepu8_epi16(_mm256_castsi128_si256(src));
+    const __m512i ref_16 = _mm512_cvtepu8_epi16(_mm256_castsi128_si256(ref));
+    const __m512i diff = _mm512_sub_epi16(src_16, ref_16);
+    const __m512i squared = _mm512_mullo_epi16(diff, diff);
+    
+    const __m512i squared_lo = _mm512_unpacklo_epi16(squared, _mm512_setzero_si512());
+    sum_sse = _mm512_add_epi32(sum_sse, squared_lo);
+  }
+  
+  const int64_t sum = _mm512_reduce_add_epi64(sum_diff);
+  *sse = _mm512_reduce_add_epi32(sum_sse);
+  
+  return *sse - (unsigned int)(((int64_t)sum * sum) >> 5);  // Divide by 32
+}
+
+unsigned int vpx_variance4x8_avx512(const uint8_t *src_ptr, int src_stride,
+                                    const uint8_t *ref_ptr, int ref_stride,
+                                    unsigned int *sse) {
+  unsigned int sum = 0;
+  unsigned int sum_sq = 0;
+  
+  for (int i = 0; i < 8; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      const int diff = src_ptr[i * src_stride + j] - ref_ptr[i * ref_stride + j];
+      sum += diff;
+      sum_sq += diff * diff;
+    }
+  }
+  
+  *sse = sum_sq;
+  return sum_sq - (unsigned int)(((int64_t)sum * sum) >> 5);  // Divide by 32
+}
+
+unsigned int vpx_variance4x4_avx512(const uint8_t *src_ptr, int src_stride,
+                                    const uint8_t *ref_ptr, int ref_stride,
+                                    unsigned int *sse) {
+  unsigned int sum = 0;
+  unsigned int sum_sq = 0;
+  
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      const int diff = src_ptr[i * src_stride + j] - ref_ptr[i * ref_stride + j];
+      sum += diff;
+      sum_sq += diff * diff;
+    }
+  }
+  
+  *sse = sum_sq;
+  return sum_sq - (unsigned int)(((int64_t)sum * sum) >> 4);  // Divide by 16
+}
+
+// Additional subpixel variance functions
+unsigned int vpx_sub_pixel_variance8x16_avx512(const uint8_t *src,
+                                               int src_stride,
+                                               int x_offset, int y_offset,
+                                               const uint8_t *ref,
+                                               int ref_stride,
+                                               unsigned int *sse) {
+  if (x_offset == 0 && y_offset == 0) {
+    return vpx_variance8x16_avx512(src, src_stride, ref, ref_stride, sse);
+  } else {
+    // Fall back to reference implementation for subpixel cases
+    return vpx_sub_pixel_variance8x16_c(src, src_stride, x_offset, y_offset,
+                                        ref, ref_stride, sse);
+  }
+}
+
+unsigned int vpx_sub_pixel_variance8x8_avx512(const uint8_t *src,
+                                              int src_stride,
+                                              int x_offset, int y_offset,
+                                              const uint8_t *ref,
+                                              int ref_stride,
+                                              unsigned int *sse) {
+  if (x_offset == 0 && y_offset == 0) {
+    return vpx_variance8x8_avx512(src, src_stride, ref, ref_stride, sse);
+  } else {
+    // Fall back to reference implementation for subpixel cases
+    return vpx_sub_pixel_variance8x8_c(src, src_stride, x_offset, y_offset,
+                                       ref, ref_stride, sse);
+  }
+}
+
+unsigned int vpx_sub_pixel_variance8x4_avx512(const uint8_t *src,
+                                              int src_stride,
+                                              int x_offset, int y_offset,
+                                              const uint8_t *ref,
+                                              int ref_stride,
+                                              unsigned int *sse) {
+  if (x_offset == 0 && y_offset == 0) {
+    return vpx_variance8x4_avx512(src, src_stride, ref, ref_stride, sse);
+  } else {
+    // Fall back to reference implementation for subpixel cases
+    return vpx_sub_pixel_variance8x4_c(src, src_stride, x_offset, y_offset,
+                                       ref, ref_stride, sse);
+  }
+}
+
+unsigned int vpx_sub_pixel_variance4x8_avx512(const uint8_t *src,
+                                              int src_stride,
+                                              int x_offset, int y_offset,
+                                              const uint8_t *ref,
+                                              int ref_stride,
+                                              unsigned int *sse) {
+  if (x_offset == 0 && y_offset == 0) {
+    return vpx_variance4x8_avx512(src, src_stride, ref, ref_stride, sse);
+  } else {
+    // Fall back to reference implementation for subpixel cases
+    return vpx_sub_pixel_variance4x8_c(src, src_stride, x_offset, y_offset,
+                                       ref, ref_stride, sse);
+  }
+}
+
+unsigned int vpx_sub_pixel_variance4x4_avx512(const uint8_t *src,
+                                              int src_stride,
+                                              int x_offset, int y_offset,
+                                              const uint8_t *ref,
+                                              int ref_stride,
+                                              unsigned int *sse) {
+  if (x_offset == 0 && y_offset == 0) {
+    return vpx_variance4x4_avx512(src, src_stride, ref, ref_stride, sse);
+  } else {
+    // Fall back to reference implementation for subpixel cases
+    return vpx_sub_pixel_variance4x4_c(src, src_stride, x_offset, y_offset,
+                                       ref, ref_stride, sse);
+  }
+}
