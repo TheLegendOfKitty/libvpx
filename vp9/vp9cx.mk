@@ -145,6 +145,7 @@ VP9_CX_SRCS-$(HAVE_NEON) += encoder/arm/neon/vp9_denoiser_neon.c
 endif
 
 VP9_CX_SRCS-$(HAVE_AVX2) += encoder/x86/vp9_error_avx2.c
+VP9_CX_SRCS-$(HAVE_AVX512) += encoder/x86/vp9_error_avx512.c
 
 VP9_CX_SRCS-$(HAVE_NEON) += encoder/arm/neon/vp9_error_neon.c
 VP9_CX_SRCS-$(HAVE_SVE)  += encoder/arm/neon/vp9_error_sve.c

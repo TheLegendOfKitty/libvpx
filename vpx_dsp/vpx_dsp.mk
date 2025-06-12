@@ -189,6 +189,7 @@ DSP_SRCS-yes += loopfilter.c
 
 DSP_SRCS-$(HAVE_SSE2)  += x86/loopfilter_sse2.c
 DSP_SRCS-$(HAVE_AVX2)  += x86/loopfilter_avx2.c
+DSP_SRCS-$(HAVE_AVX512) += x86/loopfilter_avx512.c
 
 ifeq ($(HAVE_NEON_ASM),yes)
 DSP_SRCS-yes  += arm/loopfilter_16_neon$(ASM)
@@ -446,6 +447,10 @@ DSP_SRCS-$(HAVE_AVX2)   += x86/avg_pred_avx2.c
 DSP_SRCS-$(HAVE_SSE2)   += x86/variance_sse2.c  # Contains SSE2 and SSSE3
 DSP_SRCS-$(HAVE_AVX2)   += x86/variance_avx2.c
 DSP_SRCS-$(HAVE_AVX512) += x86/variance_avx512.c
+DSP_SRCS-$(HAVE_AVX512) += x86/subtract_avx512.c
+DSP_SRCS-$(HAVE_AVX512) += x86/avg_intrin_avx512.c
+DSP_SRCS-$(HAVE_AVX512) += x86/intrapred_avx512.c
+DSP_SRCS-$(HAVE_AVX512) += x86/hadamard_avx512.c
 DSP_SRCS-$(HAVE_VSX)    += ppc/variance_vsx.c
 
 ifeq ($(VPX_ARCH_X86_64),yes)
