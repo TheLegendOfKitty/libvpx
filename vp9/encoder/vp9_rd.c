@@ -793,3 +793,28 @@ int vp9_get_intra_cost_penalty(const VP9_COMP *const cpi, BLOCK_SIZE bsize,
   // independent rate penalty.
   return (20 * vp9_dc_quant(qindex, qdelta, VPX_BITS_8)) >> reduction_fac;
 }
+
+// Reference implementations for RD optimization functions
+uint64_t vp9_sum_squares_2d_c(const int16_t *src, int src_stride, int size) {
+  uint64_t sum_sq = 0;
+  for (int i = 0; i < size; i++) {
+    for (int j = 0; j < size; j++) {
+      const int16_t val = src[i * src_stride + j];
+      sum_sq += (uint64_t)(val * val);
+    }
+  }
+  return sum_sq;
+}
+
+uint64_t vp9_block_diff_sse_c(const uint8_t *src, int src_stride,
+                              const uint8_t *pred, int pred_stride,
+                              int block_size) {
+  uint64_t sse = 0;
+  for (int i = 0; i < block_size; i++) {
+    for (int j = 0; j < block_size; j++) {
+      const int diff = src[i * src_stride + j] - pred[i * pred_stride + j];
+      sse += (uint64_t)(diff * diff);
+    }
+  }
+  return sse;
+}

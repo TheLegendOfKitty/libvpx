@@ -139,6 +139,13 @@ specialize qw/vp9_quantize_fp neon sse2 ssse3 avx2 vsx/;
 add_proto qw/void vp9_quantize_fp_32x32/, "const tran_low_t *coeff_ptr, intptr_t n_coeffs, const struct macroblock_plane *const mb_plane, tran_low_t *qcoeff_ptr, tran_low_t *dqcoeff_ptr, const int16_t *dequant_ptr, uint16_t *eob_ptr, const struct ScanOrder *const scan_order";
 specialize qw/vp9_quantize_fp_32x32 neon ssse3 avx2 vsx/;
 
+# RD optimization functions
+add_proto qw/uint64_t vp9_sum_squares_2d/, "const int16_t *src, int src_stride, int size";
+specialize qw/vp9_sum_squares_2d neon/;
+
+add_proto qw/uint64_t vp9_block_diff_sse/, "const uint8_t *src, int src_stride, const uint8_t *pred, int pred_stride, int block_size";
+specialize qw/vp9_block_diff_sse neon/;
+
 if (vpx_config("CONFIG_VP9_HIGHBITDEPTH") eq "yes") {
   specialize qw/vp9_block_error neon sve avx2 sse2/;
 
