@@ -100,8 +100,8 @@ static INLINE unsigned int sad32xh_avx512(const uint8_t *src_ptr,
     src_reg = _mm256_loadu_si256((const __m256i *)src_ptr);
     ref_reg = _mm256_loadu_si256((const __m256i *)ref_ptr);
     sad_reg = _mm256_sad_epu8(src_reg, ref_reg);
-    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi256_si128(sad_reg)));
-    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_extracti128_si256(sad_reg, 1)));
+    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi128_si256(_mm256_castsi256_si128(sad_reg))));
+    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi128_si256(_mm256_extracti128_si256(sad_reg, 1))));
     
     ref_ptr += ref_stride;
     src_ptr += src_stride;
@@ -142,7 +142,7 @@ static INLINE unsigned int sad16xh_avx512(const uint8_t *src_ptr,
     src_reg = _mm_loadu_si128((const __m128i *)src_ptr);
     ref_reg = _mm_loadu_si128((const __m128i *)ref_ptr);
     sad_reg = _mm_sad_epu8(src_reg, ref_reg);
-    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(sad_reg));
+    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi128_si256(sad_reg)));
     
     ref_ptr += ref_stride;
     src_ptr += src_stride;
@@ -194,8 +194,8 @@ unsigned int vpx_sad32x32_avg_avx512(const uint8_t *src_ptr, int src_stride,
     pred_reg = _mm256_loadu_si256((const __m256i *)second_pred);
     ref_reg = _mm256_avg_epu8(ref_reg, pred_reg);
     sad_reg = _mm256_sad_epu8(src_reg, ref_reg);
-    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi256_si128(sad_reg)));
-    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_extracti128_si256(sad_reg, 1)));
+    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi128_si256(_mm256_castsi256_si128(sad_reg))));
+    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi128_si256(_mm256_extracti128_si256(sad_reg, 1))));
     
     ref_ptr += ref_stride;
     src_ptr += src_stride;
@@ -217,8 +217,8 @@ unsigned int vpx_sad32x16_avg_avx512(const uint8_t *src_ptr, int src_stride,
     pred_reg = _mm256_loadu_si256((const __m256i *)second_pred);
     ref_reg = _mm256_avg_epu8(ref_reg, pred_reg);
     sad_reg = _mm256_sad_epu8(src_reg, ref_reg);
-    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi256_si128(sad_reg)));
-    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_extracti128_si256(sad_reg, 1)));
+    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi128_si256(_mm256_castsi256_si128(sad_reg))));
+    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi128_si256(_mm256_extracti128_si256(sad_reg, 1))));
     
     ref_ptr += ref_stride;
     src_ptr += src_stride;
@@ -240,7 +240,7 @@ unsigned int vpx_sad16x32_avg_avx512(const uint8_t *src_ptr, int src_stride,
     pred_reg = _mm_loadu_si128((const __m128i *)second_pred);
     ref_reg = _mm_avg_epu8(ref_reg, pred_reg);
     sad_reg = _mm_sad_epu8(src_reg, ref_reg);
-    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(sad_reg));
+    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi128_si256(sad_reg)));
     
     ref_ptr += ref_stride;
     src_ptr += src_stride;
@@ -262,7 +262,7 @@ unsigned int vpx_sad16x16_avg_avx512(const uint8_t *src_ptr, int src_stride,
     pred_reg = _mm_loadu_si128((const __m128i *)second_pred);
     ref_reg = _mm_avg_epu8(ref_reg, pred_reg);
     sad_reg = _mm_sad_epu8(src_reg, ref_reg);
-    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(sad_reg));
+    sum_sad = _mm512_add_epi32(sum_sad, _mm512_cvtepi32_epi64(_mm256_castsi128_si256(sad_reg)));
     
     ref_ptr += ref_stride;
     src_ptr += src_stride;

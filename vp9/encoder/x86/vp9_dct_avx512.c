@@ -27,10 +27,10 @@
 static INLINE void load_buffer_4x4_avx512(const int16_t *input, __m512i *in,
                                           int stride) {
   const __m512i k__nonzero_bias_a = _mm512_set1_epi16(1);
-  const __m512i k__nonzero_bias_b = _mm512_setr_epi16(1, 0, 0, 0, 0, 0, 0, 0,
-                                                       0, 0, 0, 0, 0, 0, 0, 0,
-                                                       0, 0, 0, 0, 0, 0, 0, 0,
-                                                       0, 0, 0, 0, 0, 0, 0, 0);
+  // Create bias vector with 1 in first position, 0s elsewhere (since _mm512_set_epi16 doesn't exist)
+  const __m512i k__nonzero_bias_b = _mm512_set_epi16(
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
   __m512i mask;
 
   // Load 4 rows of 4 elements each into a single 512-bit register
@@ -49,8 +49,9 @@ static INLINE void load_buffer_4x4_avx512(const int16_t *input, __m512i *in,
   // Scale by 4 (left shift by 2)
   *in = _mm512_slli_epi16(*in, 4);
 
-  // Apply nonzero bias
-  mask = _mm512_cmpeq_epi16(*in, k__nonzero_bias_a);
+  // Apply nonzero bias (convert mask to vector since _mm512_cmpeq_epi16 returns mask)
+  __mmask32 cmp_mask = _mm512_cmpeq_epi16_mask(*in, k__nonzero_bias_a);
+  mask = _mm512_maskz_set1_epi16(cmp_mask, -1);
   *in = _mm512_add_epi16(*in, _mm512_and_si512(mask, k__nonzero_bias_a));
   *in = _mm512_add_epi16(*in, k__nonzero_bias_b);
 }
@@ -79,15 +80,15 @@ static INLINE void write_buffer_4x4_avx512(tran_low_t *output, const __m512i *re
 // AVX-512 optimized 4-point DCT
 static void fdct4_avx512(__m512i *in) {
   const __m512i k__cospi_p16_p16 = _mm512_set1_epi16(cospi_16_64);
-  const __m512i k__cospi_p16_m16 = _mm512_setr_epi16(cospi_16_64, -cospi_16_64, cospi_16_64, -cospi_16_64,
-                                                      cospi_16_64, -cospi_16_64, cospi_16_64, -cospi_16_64,
-                                                      cospi_16_64, -cospi_16_64, cospi_16_64, -cospi_16_64,
-                                                      cospi_16_64, -cospi_16_64, cospi_16_64, -cospi_16_64,
-                                                      cospi_16_64, -cospi_16_64, cospi_16_64, -cospi_16_64,
-                                                      cospi_16_64, -cospi_16_64, cospi_16_64, -cospi_16_64,
-                                                      cospi_16_64, -cospi_16_64, cospi_16_64, -cospi_16_64,
-                                                      cospi_16_64, -cospi_16_64, cospi_16_64, -cospi_16_64);
-  const __m512i k__cospi_p08_p24 = _mm512_setr_epi16(cospi_8_64, cospi_24_64, cospi_8_64, cospi_24_64,
+  const __m512i k__cospi_p16_m16 = _mm512_set_epi16(-cospi_16_64, cospi_16_64, -cospi_16_64, cospi_16_64,
+                                                      -cospi_16_64, cospi_16_64, -cospi_16_64, cospi_16_64,
+                                                      -cospi_16_64, cospi_16_64, -cospi_16_64, cospi_16_64,
+                                                      -cospi_16_64, cospi_16_64, -cospi_16_64, cospi_16_64,
+                                                      -cospi_16_64, cospi_16_64, -cospi_16_64, cospi_16_64,
+                                                      -cospi_16_64, cospi_16_64, -cospi_16_64, cospi_16_64,
+                                                      -cospi_16_64, cospi_16_64, -cospi_16_64, cospi_16_64,
+                                                      -cospi_16_64, cospi_16_64, -cospi_16_64, cospi_16_64);
+  const __m512i k__cospi_p08_p24 = _mm512_set_epi16(cospi_8_64, cospi_24_64, cospi_8_64, cospi_24_64,
                                                       cospi_8_64, cospi_24_64, cospi_8_64, cospi_24_64,
                                                       cospi_8_64, cospi_24_64, cospi_8_64, cospi_24_64,
                                                       cospi_8_64, cospi_24_64, cospi_8_64, cospi_24_64,
@@ -95,7 +96,7 @@ static void fdct4_avx512(__m512i *in) {
                                                       cospi_8_64, cospi_24_64, cospi_8_64, cospi_24_64,
                                                       cospi_8_64, cospi_24_64, cospi_8_64, cospi_24_64,
                                                       cospi_8_64, cospi_24_64, cospi_8_64, cospi_24_64);
-  const __m512i k__cospi_p24_m08 = _mm512_setr_epi16(cospi_24_64, -cospi_8_64, cospi_24_64, -cospi_8_64,
+  const __m512i k__cospi_p24_m08 = _mm512_set_epi16(cospi_24_64, -cospi_8_64, cospi_24_64, -cospi_8_64,
                                                       cospi_24_64, -cospi_8_64, cospi_24_64, -cospi_8_64,
                                                       cospi_24_64, -cospi_8_64, cospi_24_64, -cospi_8_64,
                                                       cospi_24_64, -cospi_8_64, cospi_24_64, -cospi_8_64,
@@ -109,8 +110,8 @@ static void fdct4_avx512(__m512i *in) {
   
   // Rearrange input for butterfly operations
   // Process multiple 4x4 blocks simultaneously
-  u[0] = _mm512_unpacklo_epi16(*in, _mm512_srli_si512(*in, 8));  // [0,1] pairs
-  u[1] = _mm512_unpackhi_epi16(_mm512_srli_si512(*in, 16), _mm512_srli_si512(*in, 8));  // [3,2] pairs
+  u[0] = _mm512_unpacklo_epi16(*in, _mm512_bsrli_epi128(*in, 8));  // [0,1] pairs
+  u[1] = _mm512_unpackhi_epi16(_mm512_bsrli_epi128(*in, 16), _mm512_bsrli_epi128(*in, 8));  // [3,2] pairs
 
   v[0] = _mm512_add_epi16(u[0], u[1]);  // [0+3, 1+2]
   v[1] = _mm512_sub_epi16(u[0], u[1]);  // [0-3, 1-2]
@@ -142,7 +143,7 @@ static void fdct4_avx512(__m512i *in) {
 
 // AVX-512 optimized 4-point ADST
 static void fadst4_avx512(__m512i *in) {
-  const __m512i k__sinpi_p01_p02 = _mm512_setr_epi16(sinpi_1_9, sinpi_2_9, sinpi_1_9, sinpi_2_9,
+  const __m512i k__sinpi_p01_p02 = _mm512_set_epi16(sinpi_1_9, sinpi_2_9, sinpi_1_9, sinpi_2_9,
                                                       sinpi_1_9, sinpi_2_9, sinpi_1_9, sinpi_2_9,
                                                       sinpi_1_9, sinpi_2_9, sinpi_1_9, sinpi_2_9,
                                                       sinpi_1_9, sinpi_2_9, sinpi_1_9, sinpi_2_9,
@@ -150,7 +151,7 @@ static void fadst4_avx512(__m512i *in) {
                                                       sinpi_1_9, sinpi_2_9, sinpi_1_9, sinpi_2_9,
                                                       sinpi_1_9, sinpi_2_9, sinpi_1_9, sinpi_2_9,
                                                       sinpi_1_9, sinpi_2_9, sinpi_1_9, sinpi_2_9);
-  const __m512i k__sinpi_p04_m01 = _mm512_setr_epi16(sinpi_4_9, -sinpi_1_9, sinpi_4_9, -sinpi_1_9,
+  const __m512i k__sinpi_p04_m01 = _mm512_set_epi16(sinpi_4_9, -sinpi_1_9, sinpi_4_9, -sinpi_1_9,
                                                       sinpi_4_9, -sinpi_1_9, sinpi_4_9, -sinpi_1_9,
                                                       sinpi_4_9, -sinpi_1_9, sinpi_4_9, -sinpi_1_9,
                                                       sinpi_4_9, -sinpi_1_9, sinpi_4_9, -sinpi_1_9,
@@ -158,7 +159,7 @@ static void fadst4_avx512(__m512i *in) {
                                                       sinpi_4_9, -sinpi_1_9, sinpi_4_9, -sinpi_1_9,
                                                       sinpi_4_9, -sinpi_1_9, sinpi_4_9, -sinpi_1_9,
                                                       sinpi_4_9, -sinpi_1_9, sinpi_4_9, -sinpi_1_9);
-  const __m512i k__sinpi_p03_p04 = _mm512_setr_epi16(sinpi_3_9, sinpi_4_9, sinpi_3_9, sinpi_4_9,
+  const __m512i k__sinpi_p03_p04 = _mm512_set_epi16(sinpi_3_9, sinpi_4_9, sinpi_3_9, sinpi_4_9,
                                                       sinpi_3_9, sinpi_4_9, sinpi_3_9, sinpi_4_9,
                                                       sinpi_3_9, sinpi_4_9, sinpi_3_9, sinpi_4_9,
                                                       sinpi_3_9, sinpi_4_9, sinpi_3_9, sinpi_4_9,
@@ -166,7 +167,7 @@ static void fadst4_avx512(__m512i *in) {
                                                       sinpi_3_9, sinpi_4_9, sinpi_3_9, sinpi_4_9,
                                                       sinpi_3_9, sinpi_4_9, sinpi_3_9, sinpi_4_9,
                                                       sinpi_3_9, sinpi_4_9, sinpi_3_9, sinpi_4_9);
-  const __m512i k__sinpi_m03_p02 = _mm512_setr_epi16(-sinpi_3_9, sinpi_2_9, -sinpi_3_9, sinpi_2_9,
+  const __m512i k__sinpi_m03_p02 = _mm512_set_epi16(-sinpi_3_9, sinpi_2_9, -sinpi_3_9, sinpi_2_9,
                                                       -sinpi_3_9, sinpi_2_9, -sinpi_3_9, sinpi_2_9,
                                                       -sinpi_3_9, sinpi_2_9, -sinpi_3_9, sinpi_2_9,
                                                       -sinpi_3_9, sinpi_2_9, -sinpi_3_9, sinpi_2_9,

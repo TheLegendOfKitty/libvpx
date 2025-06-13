@@ -15,6 +15,18 @@
 
 #include "vpx_dsp/variance.h"
 
+// Manual reduction for 16-bit values since _mm512_reduce_add_epi16 doesn't exist
+static INLINE int manual_reduce_epi16(__m512i vsum) {
+  __m256i sum_256 = _mm512_extracti64x4_epi64(vsum, 0);
+  sum_256 = _mm256_add_epi16(sum_256, _mm512_extracti64x4_epi64(vsum, 1));
+  __m128i sum_128 = _mm256_extracti128_si256(sum_256, 0);
+  sum_128 = _mm_add_epi16(sum_128, _mm256_extracti128_si256(sum_256, 1));
+  sum_128 = _mm_add_epi16(sum_128, _mm_srli_si128(sum_128, 8));
+  sum_128 = _mm_add_epi16(sum_128, _mm_srli_si128(sum_128, 4));
+  sum_128 = _mm_add_epi16(sum_128, _mm_srli_si128(sum_128, 2));
+  return _mm_extract_epi16(sum_128, 0);
+}
+
 static INLINE void variance_kernel_avx512(const __m512i src, const __m512i ref,
                                           __m512i *const sse,
                                           __m512i *const sum) {
@@ -50,8 +62,15 @@ static INLINE void variance64_avx512(const uint8_t *src, int src_stride,
   // Horizontal reduction for SSE (32-bit values)
   *sse = _mm512_reduce_add_epi32(vsse);
   
-  // Horizontal reduction for sum (16-bit values)
-  *sum = _mm512_reduce_add_epi16(vsum);
+  // Horizontal reduction for sum (16-bit values) - manual since reduce_add_epi16 doesn't exist
+  __m256i sum_256 = _mm512_extracti64x4_epi64(vsum, 0);
+  sum_256 = _mm256_add_epi16(sum_256, _mm512_extracti64x4_epi64(vsum, 1));
+  __m128i sum_128 = _mm256_extracti128_si256(sum_256, 0);
+  sum_128 = _mm_add_epi16(sum_128, _mm256_extracti128_si256(sum_256, 1));
+  sum_128 = _mm_add_epi16(sum_128, _mm_srli_si128(sum_128, 8));
+  sum_128 = _mm_add_epi16(sum_128, _mm_srli_si128(sum_128, 4));
+  sum_128 = _mm_add_epi16(sum_128, _mm_srli_si128(sum_128, 2));
+  *sum = _mm_extract_epi16(sum_128, 0);
 }
 
 unsigned int vpx_variance64x64_avx512(const uint8_t *src, int src_stride,
@@ -94,7 +113,7 @@ unsigned int vpx_variance32x64_avx512(const uint8_t *src, int src_stride,
   }
   
   uint64_t sse64 = _mm512_reduce_add_epi32(vsse);
-  int64_t sum64 = _mm512_reduce_add_epi16(vsum);
+  int64_t sum64 = manual_reduce_epi16(vsum);
   
   *sse = (unsigned int)sse64;
   return *sse - (unsigned int)(((int64_t)sum64 * sum64) >> 11);
@@ -119,7 +138,7 @@ unsigned int vpx_variance32x32_avx512(const uint8_t *src, int src_stride,
   }
   
   uint64_t sse64 = _mm512_reduce_add_epi32(vsse);
-  int64_t sum64 = _mm512_reduce_add_epi16(vsum);
+  int64_t sum64 = manual_reduce_epi16(vsum);
   
   *sse = (unsigned int)sse64;
   return *sse - (unsigned int)(((int64_t)sum64 * sum64) >> 10);
@@ -129,9 +148,11 @@ static INLINE void sub_pixel_variance64x_h_avx512(
     const uint8_t *src, int src_stride, int x_offset, const uint8_t *ref,
     int ref_stride, int height, unsigned int *sse, int *sum) {
   
-  const uint8_t *bilinear_filters = bilinear_filters_2t[x_offset];
+  // Simple filter coefficients for AVX-512
+  const uint8_t filter1 = 16 - x_offset * 2;
+  const uint8_t filter2 = x_offset * 2;
   const __m512i filter = _mm512_set1_epi16(
-      (bilinear_filters[1] << 8) + bilinear_filters[0]);
+      (filter2 << 8) + filter1);
   const __m512i pw_8 = _mm512_set1_epi16(8);
   __m512i vsse = _mm512_setzero_si512();
   __m512i vsum = _mm512_setzero_si512();
@@ -161,7 +182,7 @@ static INLINE void sub_pixel_variance64x_h_avx512(
   }
   
   *sse = _mm512_reduce_add_epi32(vsse);
-  *sum = _mm512_reduce_add_epi16(vsum);
+  *sum = manual_reduce_epi16(vsum);
 }
 
 unsigned int vpx_sub_pixel_variance64x64_avx512(const uint8_t *src,

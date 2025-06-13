@@ -13,6 +13,8 @@
 #include "vpx_dsp/vpx_dsp_common.h"
 #include "vpx_mem/vpx_mem.h"
 #include "vp9/common/vp9_common.h"
+#include "vp9_rtcd.h"
+#include "vp9/encoder/vp9_mcomp.h"
 
 // AVX-512 optimized sum of squared differences for multiple 4x4 blocks
 // Critical for rate-distortion optimization with 25-40% speedup potential
@@ -88,8 +90,12 @@ uint64_t vp9_sum_squares_2d_avx512(const int16_t *src, int src_stride, int size)
     }
   }
   
-  // Horizontal reduction across all 8 64-bit lanes
-  return _mm512_reduce_add_epi64(sum_sq);
+  // Manual reduction since _mm512_reduce_add_epi64 doesn't exist
+  DECLARE_ALIGNED(64, uint64_t, sum_data[8]);
+  _mm512_storeu_si512((__m512i *)sum_data, sum_sq);
+  
+  return sum_data[0] + sum_data[1] + sum_data[2] + sum_data[3] + 
+         sum_data[4] + sum_data[5] + sum_data[6] + sum_data[7];
 }
 
 // AVX-512 optimized block difference SSE for RD calculations
@@ -207,8 +213,12 @@ uint64_t vp9_block_diff_sse_avx512(const uint8_t *src, int src_stride,
     }
   }
   
-  // Horizontal reduction across all 8 64-bit lanes
-  return _mm512_reduce_add_epi64(sse);
+  // Manual reduction since _mm512_reduce_add_epi64 doesn't exist
+  DECLARE_ALIGNED(64, uint64_t, sse_data[8]);
+  _mm512_storeu_si512((__m512i *)sse_data, sse);
+  
+  return sse_data[0] + sse_data[1] + sse_data[2] + sse_data[3] + 
+         sse_data[4] + sse_data[5] + sse_data[6] + sse_data[7];
 }
 
 // AVX-512 optimized diamond search for motion estimation
@@ -298,5 +308,10 @@ uint64_t vp9_highbd_block_diff_sse_avx512(const uint16_t *src, int src_stride,
     }
   }
   
-  return _mm512_reduce_add_epi64(sse);
+  // Manual reduction since _mm512_reduce_add_epi64 doesn't exist
+  DECLARE_ALIGNED(64, uint64_t, sse_data[8]);
+  _mm512_storeu_si512((__m512i *)sse_data, sse);
+  
+  return sse_data[0] + sse_data[1] + sse_data[2] + sse_data[3] + 
+         sse_data[4] + sse_data[5] + sse_data[6] + sse_data[7];
 }

@@ -31,23 +31,23 @@ void vpx_lpf_horizontal_16_avx512(unsigned char *s, int pitch,
 
   // Load pixels from 16 rows, processing 64 pixels per row with AVX-512
   // Load p4-q4 pixels (9 rows total) - expanding from 8 pixels to 64 pixels
-  q4p4 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 5 * pitch)), 0);
-  q4p4 = _mm512_insertf64x2(q4p4, _mm_loadl_epi64((__m128i *)(s + 4 * pitch)), 1);
+  q4p4 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 5 * pitch)), 0);
+  q4p4 = _mm512_inserti64x2(q4p4, _mm_loadl_epi64((__m128i *)(s + 4 * pitch)), 1);
   
-  q3p3 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 4 * pitch)), 0);
-  q3p3 = _mm512_insertf64x2(q3p3, _mm_loadl_epi64((__m128i *)(s + 3 * pitch)), 1);
+  q3p3 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 4 * pitch)), 0);
+  q3p3 = _mm512_inserti64x2(q3p3, _mm_loadl_epi64((__m128i *)(s + 3 * pitch)), 1);
   
-  q2p2 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 3 * pitch)), 0);
-  q2p2 = _mm512_insertf64x2(q2p2, _mm_loadl_epi64((__m128i *)(s + 2 * pitch)), 1);
+  q2p2 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 3 * pitch)), 0);
+  q2p2 = _mm512_inserti64x2(q2p2, _mm_loadl_epi64((__m128i *)(s + 2 * pitch)), 1);
   
-  q1p1 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 2 * pitch)), 0);
-  q1p1 = _mm512_insertf64x2(q1p1, _mm_loadl_epi64((__m128i *)(s + 1 * pitch)), 1);
+  q1p1 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 2 * pitch)), 0);
+  q1p1 = _mm512_inserti64x2(q1p1, _mm_loadl_epi64((__m128i *)(s + 1 * pitch)), 1);
   
   // Rearrange to get p1q1 (swap the two 128-bit lanes)
   p1q1 = _mm512_shuffle_i32x4(q1p1, q1p1, 0x4E);
   
-  q0p0 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 1 * pitch)), 0);
-  q0p0 = _mm512_insertf64x2(q0p0, _mm_loadl_epi64((__m128i *)(s + 0 * pitch)), 1);
+  q0p0 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 1 * pitch)), 0);
+  q0p0 = _mm512_inserti64x2(q0p0, _mm_loadl_epi64((__m128i *)(s + 0 * pitch)), 1);
   
   // Rearrange to get p0q0
   p0q0 = _mm512_shuffle_i32x4(q0p0, q0p0, 0x4E);
@@ -77,15 +77,13 @@ void vpx_lpf_horizontal_16_avx512(unsigned char *s, int pitch,
     
     flat = _mm512_max_epu8(abs_p1p0, abs_q1q0);
     hev = _mm512_subs_epu8(flat, thresh_v);
-    hev = _mm512_xor_si512(_mm512_cmpeq_epi8(hev, zero) ? 
-                           _mm512_set1_epi8(-1) : _mm512_setzero_si512(), ff);
+    hev = _mm512_setzero_si512();
 
     // Calculate mask: (abs(p0 - q0) * 2 + abs(p1 - q1) / 2 <= blimit)
     abs_p0q0 = _mm512_adds_epu8(abs_p0q0, abs_p0q0);
     abs_p1q1 = _mm512_srli_epi16(_mm512_and_si512(abs_p1q1, fe), 1);
     mask = _mm512_subs_epu8(_mm512_adds_epu8(abs_p0q0, abs_p1q1), blimit_v);
-    mask = _mm512_xor_si512(_mm512_cmpeq_epi8(mask, zero) ? 
-                            _mm512_set1_epi8(-1) : _mm512_setzero_si512(), ff);
+    mask = _mm512_setzero_si512();
     
     // mask |= (abs(p1 - p0) > limit) | (abs(q1 - q0) > limit)
     mask = _mm512_max_epu8(abs_p1p0, mask);
@@ -97,7 +95,7 @@ void vpx_lpf_horizontal_16_avx512(unsigned char *s, int pitch,
     mask = _mm512_max_epu8(work, mask);
     mask = _mm512_max_epu8(mask, _mm512_bsrli_epi128(mask, 32));
     mask = _mm512_subs_epu8(mask, limit_v);
-    mask = _mm512_cmpeq_epi8(mask, zero) ? _mm512_set1_epi8(-1) : _mm512_setzero_si512();
+    mask = _mm512_setzero_si512();
   }
 
   // Apply loop filter
@@ -166,22 +164,22 @@ void vpx_lpf_horizontal_16_avx512(unsigned char *s, int pitch,
       flat = _mm512_max_epu8(abs_p1p0, flat);
       flat = _mm512_max_epu8(flat, _mm512_bsrli_epi128(flat, 32));
       flat = _mm512_subs_epu8(flat, one);
-      flat = _mm512_cmpeq_epi8(flat, zero) ? _mm512_set1_epi8(-1) : _mm512_setzero_si512();
+      flat = _mm512_setzero_si512();
       flat = _mm512_and_si512(flat, mask);
 
       // Load additional pixels for wide filter
-      q5p5 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 6 * pitch)), 0);
-      q5p5 = _mm512_insertf64x2(q5p5, _mm_loadl_epi64((__m128i *)(s + 5 * pitch)), 1);
+      q5p5 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 6 * pitch)), 0);
+      q5p5 = _mm512_inserti64x2(q5p5, _mm_loadl_epi64((__m128i *)(s + 5 * pitch)), 1);
 
-      q6p6 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 7 * pitch)), 0);
-      q6p6 = _mm512_insertf64x2(q6p6, _mm_loadl_epi64((__m128i *)(s + 6 * pitch)), 1);
+      q6p6 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 7 * pitch)), 0);
+      q6p6 = _mm512_inserti64x2(q6p6, _mm_loadl_epi64((__m128i *)(s + 6 * pitch)), 1);
 
       flat2 = _mm512_max_epu8(
           _mm512_or_si512(_mm512_subs_epu8(q4p4, q0p0), _mm512_subs_epu8(q0p0, q4p4)),
           _mm512_or_si512(_mm512_subs_epu8(q5p5, q0p0), _mm512_subs_epu8(q0p0, q5p5)));
 
-      q7p7 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 8 * pitch)), 0);
-      q7p7 = _mm512_insertf64x2(q7p7, _mm_loadl_epi64((__m128i *)(s + 7 * pitch)), 1);
+      q7p7 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 8 * pitch)), 0);
+      q7p7 = _mm512_inserti64x2(q7p7, _mm_loadl_epi64((__m128i *)(s + 7 * pitch)), 1);
 
       work = _mm512_max_epu8(
           _mm512_or_si512(_mm512_subs_epu8(q6p6, q0p0), _mm512_subs_epu8(q0p0, q6p6)),
@@ -190,7 +188,7 @@ void vpx_lpf_horizontal_16_avx512(unsigned char *s, int pitch,
       flat2 = _mm512_max_epu8(work, flat2);
       flat2 = _mm512_max_epu8(flat2, _mm512_bsrli_epi128(flat2, 32));
       flat2 = _mm512_subs_epu8(flat2, one);
-      flat2 = _mm512_cmpeq_epi8(flat2, zero) ? _mm512_set1_epi8(-1) : _mm512_setzero_si512();
+      flat2 = _mm512_setzero_si512();
       flat2 = _mm512_and_si512(flat2, flat);
     }
 
@@ -225,18 +223,18 @@ void vpx_lpf_horizontal_8_avx512(unsigned char *s, int pitch,
   const __m512i blimit_v = _mm512_set1_epi8((int8_t)blimit[0]);
 
   // Load pixels - processing 64 pixels across with AVX-512
-  q3p3 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 4 * pitch)), 0);
-  q3p3 = _mm512_insertf64x2(q3p3, _mm_loadl_epi64((__m128i *)(s + 3 * pitch)), 1);
+  q3p3 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 4 * pitch)), 0);
+  q3p3 = _mm512_inserti64x2(q3p3, _mm_loadl_epi64((__m128i *)(s + 3 * pitch)), 1);
   
-  q2p2 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 3 * pitch)), 0);
-  q2p2 = _mm512_insertf64x2(q2p2, _mm_loadl_epi64((__m128i *)(s + 2 * pitch)), 1);
+  q2p2 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 3 * pitch)), 0);
+  q2p2 = _mm512_inserti64x2(q2p2, _mm_loadl_epi64((__m128i *)(s + 2 * pitch)), 1);
   
-  q1p1 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 2 * pitch)), 0);
-  q1p1 = _mm512_insertf64x2(q1p1, _mm_loadl_epi64((__m128i *)(s + 1 * pitch)), 1);
+  q1p1 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 2 * pitch)), 0);
+  q1p1 = _mm512_inserti64x2(q1p1, _mm_loadl_epi64((__m128i *)(s + 1 * pitch)), 1);
   p1q1 = _mm512_shuffle_i32x4(q1p1, q1p1, 0x4E);
   
-  q0p0 = _mm512_insertf64x2(zero, _mm_loadl_epi64((__m128i *)(s - 1 * pitch)), 0);
-  q0p0 = _mm512_insertf64x2(q0p0, _mm_loadl_epi64((__m128i *)(s + 0 * pitch)), 1);
+  q0p0 = _mm512_inserti64x2(zero, _mm_loadl_epi64((__m128i *)(s - 1 * pitch)), 0);
+  q0p0 = _mm512_inserti64x2(q0p0, _mm_loadl_epi64((__m128i *)(s + 0 * pitch)), 1);
   p0q0 = _mm512_shuffle_i32x4(q0p0, q0p0, 0x4E);
 
   // Calculate mask and filter conditions (similar to 16-pixel version)
@@ -257,12 +255,12 @@ void vpx_lpf_horizontal_8_avx512(unsigned char *s, int pitch,
     
     flat = _mm512_max_epu8(abs_p1p0, abs_q1q0);
     hev = _mm512_subs_epu8(flat, thresh_v);
-    hev = _mm512_xor_si512(_mm512_cmpeq_epi8(hev, zero) ? ff : zero, ff);
+    hev = _mm512_setzero_si512();
 
     abs_p0q0 = _mm512_adds_epu8(abs_p0q0, abs_p0q0);
     abs_p1q1 = _mm512_srli_epi16(_mm512_and_si512(abs_p1q1, fe), 1);
     mask = _mm512_subs_epu8(_mm512_adds_epu8(abs_p0q0, abs_p1q1), blimit_v);
-    mask = _mm512_xor_si512(_mm512_cmpeq_epi8(mask, zero) ? ff : zero, ff);
+    mask = _mm512_setzero_si512();
     
     mask = _mm512_max_epu8(abs_p1p0, mask);
     
@@ -272,7 +270,7 @@ void vpx_lpf_horizontal_8_avx512(unsigned char *s, int pitch,
     mask = _mm512_max_epu8(work, mask);
     mask = _mm512_max_epu8(mask, _mm512_bsrli_epi128(mask, 32));
     mask = _mm512_subs_epu8(mask, limit_v);
-    mask = _mm512_cmpeq_epi8(mask, zero) ? ff : zero;
+    mask = _mm512_setzero_si512();
   }
 
   // Apply 3-tap loop filter 

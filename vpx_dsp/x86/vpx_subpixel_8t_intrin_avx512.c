@@ -46,8 +46,8 @@ static INLINE void vpx_filter_block1d16_h8_avx512(
       const __m512i f_val = _mm512_set1_epi16(filter[k]);
       
       // Shift source data by k positions
-      const __m512i src_shifted_lo = _mm512_srli_si512(src_lo, k * 2);
-      const __m512i src_shifted_hi = _mm512_srli_si512(src_hi, k * 2);
+      const __m512i src_shifted_lo = _mm512_bsrli_epi128(src_lo, k * 2);
+      const __m512i src_shifted_hi = _mm512_bsrli_epi128(src_hi, k * 2);
       
       res_lo = _mm512_add_epi16(res_lo, _mm512_mullo_epi16(src_shifted_lo, f_val));
       res_hi = _mm512_add_epi16(res_hi, _mm512_mullo_epi16(src_shifted_hi, f_val));

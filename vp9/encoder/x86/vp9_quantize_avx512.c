@@ -75,7 +75,7 @@ static INLINE void quantize_b_16x16_avx512(
     const __m512i coeff_abs = _mm512_abs_epi32(coeff);
     
     // Compare with zero bin threshold
-    const __m512i cmp_mask = _mm512_cmpge_epi32_mask(coeff_abs, zbin_ac);
+    const __mmask16 cmp_mask = _mm512_cmpge_epi32_mask(coeff_abs, zbin_ac);
     
     if (_mm512_kortestz(cmp_mask, cmp_mask)) {
       // All coefficients are below threshold - set to zero
@@ -98,17 +98,23 @@ static INLINE void quantize_b_16x16_avx512(
     const __m512i qcoeff_abs_hi = _mm512_srli_epi64(
         _mm512_mul_epu32(coeff_abs_round_hi, quant_hi), 16);
     
-    const __m512i qcoeff_abs = _mm512_packus_epi64(qcoeff_abs_lo, qcoeff_abs_hi);
+    // Manual pack since _mm512_packus_epi64 doesn't exist
+    // The result should already be in 32-bit range, so we can use shuffle/blend
+    const __m512i qcoeff_abs = _mm512_castps_si512(_mm512_shuffle_ps(
+        _mm512_castsi512_ps(qcoeff_abs_lo),
+        _mm512_castsi512_ps(qcoeff_abs_hi), 0x88));
     
-    // Apply sign
-    qcoeff = _mm512_sign_epi32(qcoeff_abs, coeff);
+    // Apply sign manually (since _mm512_sign_epi32 doesn't exist)
+    const __mmask16 sign_mask = _mm512_cmplt_epi32_mask(coeff, zero);
+    qcoeff = _mm512_mask_sub_epi32(qcoeff_abs, sign_mask, zero, qcoeff_abs);
     
     // Mask out coefficients below threshold
     qcoeff = _mm512_mask_blend_epi32(cmp_mask, zero, qcoeff);
     
     // Calculate dequantized values
     dqcoeff = _mm512_mullo_epi32(qcoeff_abs, dequant_ac);
-    dqcoeff = _mm512_sign_epi32(dqcoeff, coeff);
+    // Apply sign manually (since _mm512_sign_epi32 doesn't exist)
+    dqcoeff = _mm512_mask_sub_epi32(dqcoeff, sign_mask, zero, dqcoeff);
     dqcoeff = _mm512_mask_blend_epi32(cmp_mask, zero, dqcoeff);
     
     // Store results

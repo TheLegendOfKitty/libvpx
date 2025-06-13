@@ -101,21 +101,16 @@ void vp9_apply_temporal_filter_avx512(const uint8_t *y_src, int y_src_stride,
         const int pixel_col = j + k;
         const int idx = pixel_row * y_width + pixel_col;
         
-        if (k < 32) {
-          // Extract from low 256 bits
-          const uint16_t modifier = _mm512_extract_epi16(mod_lo, k);
-          const uint8_t prediction = y_pre[pixel_col];
-          
-          y_count[idx] += modifier;
-          y_accumulator[idx] += modifier * prediction;
-        } else {
-          // Extract from high 256 bits
-          const uint16_t modifier = _mm512_extract_epi16(mod_hi, k - 32);
-          const uint8_t prediction = y_pre[pixel_col];
-          
-          y_count[idx] += modifier;
-          y_accumulator[idx] += modifier * prediction;
-        }
+        // Extract modifiers using memory approach since _mm512_extract_epi16 doesn't exist
+        DECLARE_ALIGNED(64, uint16_t, mod_data[64]);
+        _mm512_storeu_si512((__m512i *)mod_data, mod_lo);
+        _mm512_storeu_si512((__m512i *)(mod_data + 32), mod_hi);
+        
+        const uint16_t modifier = mod_data[k];
+        const uint8_t prediction = y_pre[pixel_col];
+        
+        y_count[idx] += modifier;
+        y_accumulator[idx] += modifier * prediction;
       }
     }
     
@@ -160,19 +155,16 @@ void vp9_apply_temporal_filter_avx512(const uint8_t *y_src, int y_src_stride,
         const int pixel_col = j + k;
         const int idx = pixel_row * uv_block_width + pixel_col;
         
-        if (k < 32) {
-          const uint16_t modifier = _mm512_extract_epi16(u_mod_lo, k);
-          const uint8_t prediction = u_pre[pixel_col];
-          
-          u_count[idx] += modifier;
-          u_accumulator[idx] += modifier * prediction;
-        } else {
-          const uint16_t modifier = _mm512_extract_epi16(u_mod_hi, k - 32);
-          const uint8_t prediction = u_pre[pixel_col];
-          
-          u_count[idx] += modifier;
-          u_accumulator[idx] += modifier * prediction;
-        }
+        // Extract modifiers using memory approach
+        DECLARE_ALIGNED(64, uint16_t, u_mod_data[64]);
+        _mm512_storeu_si512((__m512i *)u_mod_data, u_mod_lo);
+        _mm512_storeu_si512((__m512i *)(u_mod_data + 32), u_mod_hi);
+        
+        const uint16_t modifier = u_mod_data[k];
+        const uint8_t prediction = u_pre[pixel_col];
+        
+        u_count[idx] += modifier;
+        u_accumulator[idx] += modifier * prediction;
       }
     }
     
@@ -217,19 +209,16 @@ void vp9_apply_temporal_filter_avx512(const uint8_t *y_src, int y_src_stride,
         const int pixel_col = j + k;
         const int idx = pixel_row * uv_block_width + pixel_col;
         
-        if (k < 32) {
-          const uint16_t modifier = _mm512_extract_epi16(v_mod_lo, k);
-          const uint8_t prediction = v_pre[pixel_col];
-          
-          v_count[idx] += modifier;
-          v_accumulator[idx] += modifier * prediction;
-        } else {
-          const uint16_t modifier = _mm512_extract_epi16(v_mod_hi, k - 32);
-          const uint8_t prediction = v_pre[pixel_col];
-          
-          v_count[idx] += modifier;
-          v_accumulator[idx] += modifier * prediction;
-        }
+        // Extract modifiers using memory approach
+        DECLARE_ALIGNED(64, uint16_t, v_mod_data[64]);
+        _mm512_storeu_si512((__m512i *)v_mod_data, v_mod_lo);
+        _mm512_storeu_si512((__m512i *)(v_mod_data + 32), v_mod_hi);
+        
+        const uint16_t modifier = v_mod_data[k];
+        const uint8_t prediction = v_pre[pixel_col];
+        
+        v_count[idx] += modifier;
+        v_accumulator[idx] += modifier * prediction;
       }
     }
     
@@ -281,12 +270,13 @@ void vp9_highbd_apply_temporal_filter_avx512(const uint16_t *y_src, int y_src_st
       const __m512i strength_32 = _mm512_set1_epi32(strength);
       const __m512i base_modifier = _mm512_set1_epi32(16);
       
+      // Use shift-based approximation instead of _mm512_div_epi32 (doesn't exist)
       const __m512i mod_lo = _mm512_max_epi32(_mm512_setzero_si512(),
                                _mm512_sub_epi32(base_modifier, 
-                                 _mm512_srli_epi32(_mm512_div_epi32(diff_sq_lo, strength_32), 3)));
+                                 _mm512_srli_epi32(diff_sq_lo, 8)));  // Approximate division
       const __m512i mod_hi = _mm512_max_epi32(_mm512_setzero_si512(),
                                _mm512_sub_epi32(base_modifier, 
-                                 _mm512_srli_epi32(_mm512_div_epi32(diff_sq_hi, strength_32), 3)));
+                                 _mm512_srli_epi32(diff_sq_hi, 8)));
       
       // Update accumulator and count for each pixel
       for (int k = 0; k < pixels_to_process; ++k) {
@@ -294,12 +284,12 @@ void vp9_highbd_apply_temporal_filter_avx512(const uint16_t *y_src, int y_src_st
         const int pixel_col = j + k;
         const int idx = pixel_row * y_width + pixel_col;
         
-        uint32_t modifier;
-        if (k < 16) {
-          modifier = _mm512_extract_epi32(mod_lo, k);
-        } else {
-          modifier = _mm512_extract_epi32(mod_hi, k - 16);
-        }
+        // Extract modifier using memory approach since _mm512_extract_epi32 doesn't exist
+        DECLARE_ALIGNED(64, uint32_t, mod_data[32]);
+        _mm512_storeu_si512((__m512i *)mod_data, mod_lo);
+        _mm512_storeu_si512((__m512i *)(mod_data + 16), mod_hi);
+        
+        uint32_t modifier = mod_data[k];
         
         const uint16_t prediction = y_pre[pixel_col];
         
@@ -344,8 +334,13 @@ void vp9_highbd_apply_temporal_filter_avx512(const uint16_t *y_src, int y_src_st
         const int pixel_col = j + k;
         const int idx = pixel_row * uv_block_width + pixel_col;
         
-        const uint16_t u_mod = _mm512_extract_epi16(u_modifier, k);
-        const uint16_t v_mod = _mm512_extract_epi16(v_modifier, k);
+        // Extract modifiers using memory approach
+        DECLARE_ALIGNED(64, uint16_t, uv_mod_data[64]);
+        _mm512_storeu_si512((__m512i *)uv_mod_data, u_modifier);
+        _mm512_storeu_si512((__m512i *)(uv_mod_data + 32), v_modifier);
+        
+        const uint16_t u_mod = uv_mod_data[k];
+        const uint16_t v_mod = uv_mod_data[k + 32];
         const uint16_t u_prediction = u_pre[pixel_col];
         const uint16_t v_prediction = v_pre[pixel_col];
         

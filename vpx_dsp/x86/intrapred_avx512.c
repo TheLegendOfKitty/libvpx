@@ -12,6 +12,18 @@
 
 #include "./vpx_dsp_rtcd.h"
 
+// Manual reduction for 16-bit values since manual_reduce_epi16 doesn't exist
+static INLINE int manual_reduce_epi16(__m512i vsum) {
+  __m256i sum_256 = _mm512_extracti64x4_epi64(vsum, 0);
+  sum_256 = _mm256_add_epi16(sum_256, _mm512_extracti64x4_epi64(vsum, 1));
+  __m128i sum_128 = _mm256_extracti128_si256(sum_256, 0);
+  sum_128 = _mm_add_epi16(sum_128, _mm256_extracti128_si256(sum_256, 1));
+  sum_128 = _mm_add_epi16(sum_128, _mm_srli_si128(sum_128, 8));
+  sum_128 = _mm_add_epi16(sum_128, _mm_srli_si128(sum_128, 4));
+  sum_128 = _mm_add_epi16(sum_128, _mm_srli_si128(sum_128, 2));
+  return _mm_extract_epi16(sum_128, 0);
+}
+
 // DC Predictor for 32x32 blocks
 void vpx_dc_predictor_32x32_avx512(uint8_t *dst, ptrdiff_t stride,
                                    const uint8_t *above, const uint8_t *left) {
@@ -28,7 +40,7 @@ void vpx_dc_predictor_32x32_avx512(uint8_t *dst, ptrdiff_t stride,
   sum = _mm512_add_epi16(sum, left_512);
   
   // Horizontal reduction to get total sum
-  const uint32_t total_sum = _mm512_reduce_add_epi16(sum);
+  const uint32_t total_sum = manual_reduce_epi16(sum);
   const uint8_t dc_val = (total_sum + 32) >> 6;  // Divide by 64 with rounding
   
   // Broadcast DC value to 512-bit vector
@@ -107,7 +119,7 @@ void vpx_dc_left_predictor_32x32_avx512(uint8_t *dst, ptrdiff_t stride,
   sum = _mm512_add_epi16(sum, left_512);
   
   // Horizontal reduction to get total sum
-  const uint32_t total_sum = _mm512_reduce_add_epi16(sum);
+  const uint32_t total_sum = manual_reduce_epi16(sum);
   const uint8_t dc_val = (total_sum + 16) >> 5;  // Divide by 32 with rounding
   
   // Broadcast DC value to 512-bit vector
@@ -131,7 +143,7 @@ void vpx_dc_top_predictor_32x32_avx512(uint8_t *dst, ptrdiff_t stride,
   sum = _mm512_add_epi16(sum, above_512);
   
   // Horizontal reduction to get total sum  
-  const uint32_t total_sum = _mm512_reduce_add_epi16(sum);
+  const uint32_t total_sum = manual_reduce_epi16(sum);
   const uint8_t dc_val = (total_sum + 16) >> 5;  // Divide by 32 with rounding
   
   // Broadcast DC value to 512-bit vector
@@ -174,7 +186,7 @@ void vpx_dc_predictor_16x16_avx512(uint8_t *dst, ptrdiff_t stride,
   
   // Horizontal reduction using AVX-512 reduction
   const __m512i sum_512 = _mm512_castsi256_si512(sum);
-  const uint32_t total_sum = _mm512_reduce_add_epi16(sum_512);
+  const uint32_t total_sum = manual_reduce_epi16(sum_512);
   const uint8_t dc_val = (total_sum + 16) >> 5;  // Divide by 32 with rounding
   
   // Broadcast DC value to 128-bit vector (16 bytes)

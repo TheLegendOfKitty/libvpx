@@ -20,6 +20,13 @@
 #define MAX_FILTER_TAP 12
 typedef int16_t InterpKernel12[MAX_FILTER_TAP];
 
+// Forward declaration for 12-tap vertical convolution
+void vpx_convolve12_vert_c(const uint8_t *src, ptrdiff_t src_stride,
+                           uint8_t *dst, ptrdiff_t dst_stride,
+                           const InterpKernel12 *filter, int x0_q4,
+                           int x_step_q4, int y0_q4, int y_step_q4, 
+                           int w, int h);
+
 // AVX-512 optimized 12-tap horizontal convolution
 // Processes up to 64 pixels per iteration for maximum throughput
 void vpx_convolve12_horiz_avx512(const uint8_t *src, ptrdiff_t src_stride,
@@ -76,13 +83,18 @@ void vpx_convolve12_horiz_avx512(const uint8_t *src, ptrdiff_t src_stride,
           const int main_count = 64 - i;
           const int extra_count = 12 - main_count;
           
-          // Extract remaining pixels from main register
+          // Use memory-based approach instead of complex extraction
+          uint8_t src_temp[64];
+          uint8_t extra_temp[32];
+          _mm512_storeu_si512((__m512i *)src_temp, src_data);
+          _mm256_storeu_si256((__m256i *)extra_temp, src_extra);
+          
+          // Copy required bytes
           for (int j = 0; j < main_count; ++j) {
-            temp_pixels[j] = _mm512_extract_epi8(src_data, i + j);
+            temp_pixels[j] = src_temp[i + j];
           }
-          // Extract additional pixels from extra register  
           for (int j = 0; j < extra_count; ++j) {
-            temp_pixels[main_count + j] = _mm256_extract_epi8(src_extra, j);
+            temp_pixels[main_count + j] = extra_temp[j];
           }
           
           pixels_128 = _mm_loadu_si128((const __m128i *)temp_pixels);
@@ -124,7 +136,7 @@ void vpx_convolve12_horiz_avx512(const uint8_t *src, ptrdiff_t src_stride,
             _mm512_cvtepi16_epi32(_mm512_extracti32x8_epi32(sum, 0)),
             round_const);
         const __m512i shifted = _mm512_srai_epi32(sum_32, FILTER_BITS);
-        const uint16_t result = (uint16_t)_mm512_extract_epi32(shifted, 0);
+        const uint16_t result = (uint16_t)_mm512_cvtsi512_si32(shifted);
         
         // Insert result at position i (only first 32 elements used)
         if (i < 32) {
@@ -407,7 +419,7 @@ void vpx_highbd_convolve12_horiz_avx512(const uint16_t *src, ptrdiff_t src_strid
         
         // Insert result at position i
         if (i < 32) {
-          const uint16_t result = _mm512_extract_epi16(result_16, 0);
+          const uint16_t result = _mm_extract_epi16(_mm512_extracti32x4_epi32(result_16, 0), 0);
           results = _mm512_mask_blend_epi16((1ULL << i), results,
                       _mm512_set1_epi16(result));
         }

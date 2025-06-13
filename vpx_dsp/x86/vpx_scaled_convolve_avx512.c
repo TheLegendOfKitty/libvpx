@@ -9,12 +9,27 @@
  */
 
 #include <immintrin.h>  // AVX-512
+#include <string.h>     // for memcpy
 
 #include "./vpx_dsp_rtcd.h"
+
 #include "vpx_dsp/vpx_dsp_common.h"
 #include "vpx_dsp/vpx_filter.h"
 #include "vpx_mem/vpx_mem.h"
 #include "vpx_ports/mem.h"
+
+// Forward declarations
+void vpx_scaled_horiz_avx512(const uint8_t *src, ptrdiff_t src_stride,
+                             uint8_t *dst, ptrdiff_t dst_stride,
+                             const InterpKernel *filter,
+                             int x0_q4, int x_step_q4,
+                             int w, int h);
+
+void vpx_scaled_vert_avx512(const uint8_t *src, ptrdiff_t src_stride,
+                            uint8_t *dst, ptrdiff_t dst_stride,
+                            const InterpKernel *filter,
+                            int y0_q4, int y_step_q4,
+                            int w, int h);
 
 // Optimized scaled 8-tap convolution using AVX-512
 void vpx_scaled_2d_avx512(const uint8_t *src, ptrdiff_t src_stride,
