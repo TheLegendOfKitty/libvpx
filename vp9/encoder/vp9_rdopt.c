@@ -836,15 +836,31 @@ static void block_rd_txfm(int plane, int block, int blk_row, int blk_col,
     const struct macroblockd_plane *const psy_pd = &xd->plane[plane];
     const int psy_src_stride = psy_p->src.stride;
     const int psy_dst_stride = psy_pd->dst.stride;
-    const uint8_t *psy_src = &psy_p->src.buf[4 * (blk_row * psy_src_stride + blk_col)];
-    const uint8_t *psy_dst = &psy_pd->dst.buf[4 * (blk_row * psy_dst_stride + blk_col)];
     const BLOCK_SIZE psy_tx_bsize = txsize_to_bsize[tx_size];
     
-    int64_t psy_rd1 = vp9_apply_psy_rd_adjustment(rd1, psy_src, psy_src_stride, psy_dst, psy_dst_stride, psy_tx_bsize, args->cpi->oxcf.psy_rd);
-    int64_t psy_rd2 = vp9_apply_psy_rd_adjustment(rd2, psy_src, psy_src_stride, psy_dst, psy_dst_stride, psy_tx_bsize, args->cpi->oxcf.psy_rd);
-    
-    rd1 = psy_rd1;
-    rd2 = psy_rd2;
+#if CONFIG_VP9_HIGHBITDEPTH
+    if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) {
+      const uint16_t *psy_src = CONVERT_TO_SHORTPTR(psy_p->src.buf) + 4 * (blk_row * psy_src_stride + blk_col);
+      const uint16_t *psy_dst = CONVERT_TO_SHORTPTR(psy_pd->dst.buf) + 4 * (blk_row * psy_dst_stride + blk_col);
+      
+      int64_t psy_rd1 = vp9_highbd_apply_psy_rd_adjustment(rd1, psy_src, psy_src_stride, psy_dst, psy_dst_stride, psy_tx_bsize, args->cpi->oxcf.psy_rd);
+      int64_t psy_rd2 = vp9_highbd_apply_psy_rd_adjustment(rd2, psy_src, psy_src_stride, psy_dst, psy_dst_stride, psy_tx_bsize, args->cpi->oxcf.psy_rd);
+      
+      rd1 = psy_rd1;
+      rd2 = psy_rd2;
+    } else {
+#endif  // CONFIG_VP9_HIGHBITDEPTH
+      const uint8_t *psy_src = &psy_p->src.buf[4 * (blk_row * psy_src_stride + blk_col)];
+      const uint8_t *psy_dst = &psy_pd->dst.buf[4 * (blk_row * psy_dst_stride + blk_col)];
+      
+      int64_t psy_rd1 = vp9_apply_psy_rd_adjustment(rd1, psy_src, psy_src_stride, psy_dst, psy_dst_stride, psy_tx_bsize, args->cpi->oxcf.psy_rd);
+      int64_t psy_rd2 = vp9_apply_psy_rd_adjustment(rd2, psy_src, psy_src_stride, psy_dst, psy_dst_stride, psy_tx_bsize, args->cpi->oxcf.psy_rd);
+      
+      rd1 = psy_rd1;
+      rd2 = psy_rd2;
+#if CONFIG_VP9_HIGHBITDEPTH
+    }
+#endif  // CONFIG_VP9_HIGHBITDEPTH
   }
 
   // TODO(jingning): temporarily enabled only for luma component
@@ -1191,11 +1207,7 @@ static int64_t rd_pick_intra4x4block(VP9_COMP *cpi, MACROBLOCK *x, int row,
       
       // Apply psychovisual rate-distortion adjustment if enabled (for 4x4 blocks)
       if (cpi->oxcf.psy_rd > 0.0) {
-        const uint8_t *src = &src_init[idx * 4 + idy * 4 * src_stride];
-        const int psy_src_stride = src_stride;
-        const uint8_t *pred = &dst_init[idx * 4 + idy * 4 * dst_stride];
-        const int pred_stride = dst_stride;
-        int64_t psy_cost = vp9_apply_psy_rd_adjustment(this_rd, src, psy_src_stride, pred, pred_stride, BLOCK_4X4, cpi->oxcf.psy_rd);
+        int64_t psy_cost = vp9_adaptive_apply_psy_rd_adjustment(this_rd, x, xd, BLOCK_4X4, cpi->oxcf.psy_rd);
         this_rd = psy_cost;
       }
 
@@ -1302,11 +1314,7 @@ static int64_t rd_pick_intra4x4block(VP9_COMP *cpi, MACROBLOCK *x, int row,
     
     // Apply psychovisual rate-distortion adjustment if enabled (for 4x4 blocks, second path)
     if (cpi->oxcf.psy_rd > 0.0) {
-      const uint8_t *src = src_init;
-      const int src_stride = p->src.stride;
-      const uint8_t *pred = dst_init;
-      const int pred_stride = dst_stride;
-      int64_t psy_cost = vp9_apply_psy_rd_adjustment(this_rd, src, src_stride, pred, pred_stride, bsize, cpi->oxcf.psy_rd);
+      int64_t psy_cost = vp9_adaptive_apply_psy_rd_adjustment(this_rd, x, xd, bsize, cpi->oxcf.psy_rd);
       this_rd = psy_cost;
     }
 
@@ -1438,11 +1446,7 @@ static int64_t rd_pick_intra_sby_mode(VP9_COMP *cpi, MACROBLOCK *x, int *rate,
     
     // Apply psychovisual rate-distortion adjustment if enabled
     if (cpi->oxcf.psy_rd > 0.0) {
-      const uint8_t *src = x->plane[0].src.buf;
-      const int src_stride = x->plane[0].src.stride;
-      const uint8_t *pred = xd->plane[0].dst.buf;
-      const int pred_stride = xd->plane[0].dst.stride;
-      int64_t psy_cost = vp9_apply_psy_rd_adjustment(this_rd, src, src_stride, pred, pred_stride, bsize, cpi->oxcf.psy_rd);
+      int64_t psy_cost = vp9_adaptive_apply_psy_rd_adjustment(this_rd, x, xd, bsize, cpi->oxcf.psy_rd);
       this_rd = psy_cost;
     }
 
@@ -1546,11 +1550,7 @@ static int64_t rd_pick_intra_sbuv_mode(VP9_COMP *cpi, MACROBLOCK *x,
     
     // Apply psychovisual rate-distortion adjustment if enabled (for chroma)
     if (cpi->oxcf.psy_rd > 0.0) {
-      const uint8_t *src = x->plane[1].src.buf;  // U plane
-      const int src_stride = x->plane[1].src.stride;
-      const uint8_t *pred = xd->plane[1].dst.buf;
-      const int pred_stride = xd->plane[1].dst.stride;
-      int64_t psy_cost = vp9_apply_psy_rd_adjustment(this_rd, src, src_stride, pred, pred_stride, bsize, cpi->oxcf.psy_rd * 0.5);  // Lower weight for chroma
+      int64_t psy_cost = vp9_adaptive_apply_psy_rd_adjustment(this_rd, x, xd, bsize, cpi->oxcf.psy_rd * 0.5);  // Lower weight for chroma
       this_rd = psy_cost;
     }
 
@@ -3988,12 +3988,7 @@ void vp9_rd_pick_inter_mode_sb(VP9_COMP *cpi, TileDataEnc *tile_data,
       
       // Apply psychovisual rate-distortion adjustment if enabled
       if (cpi->oxcf.psy_rd > 0.0 && ref_frame != INTRA_FRAME) {
-        const uint8_t *src = x->plane[0].src.buf;
-        const int src_stride = x->plane[0].src.stride;
-        const uint8_t *pred = xd->plane[0].dst.buf;
-        const int pred_stride = xd->plane[0].dst.stride;
-        int64_t psy_cost = vp9_apply_psy_rd_adjustment(this_rd, src, src_stride, pred, pred_stride, bsize, cpi->oxcf.psy_rd);
-        this_rd = psy_cost;
+        this_rd = vp9_adaptive_apply_psy_rd_adjustment(this_rd, x, xd, bsize, cpi->oxcf.psy_rd);
       }
     }
 
@@ -4811,12 +4806,7 @@ void vp9_rd_pick_inter_mode_sub8x8(VP9_COMP *cpi, TileDataEnc *tile_data,
       
       // Apply psychovisual rate-distortion adjustment if enabled
       if (cpi->oxcf.psy_rd > 0.0 && ref_frame != INTRA_FRAME) {
-        const uint8_t *src = x->plane[0].src.buf;
-        const int src_stride = x->plane[0].src.stride;
-        const uint8_t *pred = xd->plane[0].dst.buf;
-        const int pred_stride = xd->plane[0].dst.stride;
-        int64_t psy_cost = vp9_apply_psy_rd_adjustment(this_rd, src, src_stride, pred, pred_stride, bsize, cpi->oxcf.psy_rd);
-        this_rd = psy_cost;
+        this_rd = vp9_adaptive_apply_psy_rd_adjustment(this_rd, x, xd, bsize, cpi->oxcf.psy_rd);
       }
     }
 

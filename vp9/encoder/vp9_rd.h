@@ -246,6 +246,28 @@ int64_t vp9_apply_psy_rd_adjustment(int64_t original_rd,
                                     const uint8_t *pred, int pred_stride,
                                     BLOCK_SIZE bsize, double psy_rd_strength);
 
+#if CONFIG_VP9_HIGHBITDEPTH
+// High bit depth versions
+uint64_t vp9_highbd_calculate_visual_energy(const uint16_t *src, int src_stride,
+                                            int block_size);
+uint64_t vp9_highbd_calculate_visual_energy_diff(const uint16_t *src, int src_stride,
+                                                 const uint16_t *pred, int pred_stride,
+                                                 int block_size);
+int64_t vp9_highbd_calculate_psy_rd_cost(const uint16_t *src, int src_stride,
+                                         const uint16_t *pred, int pred_stride,
+                                         int block_size, double psy_rd_strength);
+int64_t vp9_highbd_apply_psy_rd_adjustment(int64_t original_rd, 
+                                           const uint16_t *src, int src_stride,
+                                           const uint16_t *pred, int pred_stride,
+                                           BLOCK_SIZE bsize, double psy_rd_strength);
+#endif  // CONFIG_VP9_HIGHBITDEPTH
+
+// Adaptive function that dispatches to appropriate bit depth version
+int64_t vp9_adaptive_apply_psy_rd_adjustment(int64_t original_rd,
+                                             const struct macroblock *x,
+                                             const struct macroblockd *xd,
+                                             BLOCK_SIZE bsize, double psy_rd_strength);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

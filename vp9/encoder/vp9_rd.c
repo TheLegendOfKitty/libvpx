@@ -844,6 +844,31 @@ uint64_t vp9_calculate_visual_energy(const uint8_t *src, int src_stride,
   return energy;
 }
 
+#if CONFIG_VP9_HIGHBITDEPTH
+uint64_t vp9_highbd_calculate_visual_energy(const uint16_t *src, int src_stride,
+                                            int block_size) {
+  uint64_t energy = 0;
+  
+  // Calculate horizontal gradients
+  for (int i = 0; i < block_size; i++) {
+    for (int j = 0; j < block_size - 1; j++) {
+      const int grad = src[i * src_stride + j + 1] - src[i * src_stride + j];
+      energy += (uint64_t)(grad * grad);
+    }
+  }
+  
+  // Calculate vertical gradients
+  for (int i = 0; i < block_size - 1; i++) {
+    for (int j = 0; j < block_size; j++) {
+      const int grad = src[(i + 1) * src_stride + j] - src[i * src_stride + j];
+      energy += (uint64_t)(grad * grad);
+    }
+  }
+  
+  return energy;
+}
+#endif  // CONFIG_VP9_HIGHBITDEPTH
+
 uint64_t vp9_calculate_visual_energy_diff(const uint8_t *src, int src_stride,
                                          const uint8_t *pred, int pred_stride,
                                          int block_size) {
@@ -853,6 +878,18 @@ uint64_t vp9_calculate_visual_energy_diff(const uint8_t *src, int src_stride,
   // Return absolute difference in visual energy
   return (src_energy > pred_energy) ? (src_energy - pred_energy) : (pred_energy - src_energy);
 }
+
+#if CONFIG_VP9_HIGHBITDEPTH
+uint64_t vp9_highbd_calculate_visual_energy_diff(const uint16_t *src, int src_stride,
+                                                 const uint16_t *pred, int pred_stride,
+                                                 int block_size) {
+  const uint64_t src_energy = vp9_highbd_calculate_visual_energy(src, src_stride, block_size);
+  const uint64_t pred_energy = vp9_highbd_calculate_visual_energy(pred, pred_stride, block_size);
+  
+  // Return absolute difference in visual energy
+  return (src_energy > pred_energy) ? (src_energy - pred_energy) : (pred_energy - src_energy);
+}
+#endif  // CONFIG_VP9_HIGHBITDEPTH
 
 int64_t vp9_calculate_psy_rd_cost(const uint8_t *src, int src_stride,
                                   const uint8_t *pred, int pred_stride,
@@ -870,6 +907,24 @@ int64_t vp9_calculate_psy_rd_cost(const uint8_t *src, int src_stride,
   return (int64_t)(scaled_energy);
 }
 
+#if CONFIG_VP9_HIGHBITDEPTH
+int64_t vp9_highbd_calculate_psy_rd_cost(const uint16_t *src, int src_stride,
+                                         const uint16_t *pred, int pred_stride,
+                                         int block_size, double psy_rd_strength) {
+  if (psy_rd_strength <= 0.0) return 0;
+  
+  const uint64_t energy_diff = vp9_highbd_calculate_visual_energy_diff(src, src_stride, 
+                                                                      pred, pred_stride, 
+                                                                      block_size);
+  
+  // Scale the energy difference by psy-rd strength
+  // Use a logarithmic scaling to avoid overwhelming the RD cost
+  const double scaled_energy = psy_rd_strength * sqrt(energy_diff);
+  
+  return (int64_t)(scaled_energy);
+}
+#endif  // CONFIG_VP9_HIGHBITDEPTH
+
 int64_t vp9_apply_psy_rd_adjustment(int64_t original_rd, 
                                     const uint8_t *src, int src_stride,
                                     const uint8_t *pred, int pred_stride,
@@ -882,4 +937,43 @@ int64_t vp9_apply_psy_rd_adjustment(int64_t original_rd,
                                                      block_size, psy_rd_strength);
   
   return original_rd + psy_cost;
+}
+
+#if CONFIG_VP9_HIGHBITDEPTH
+int64_t vp9_highbd_apply_psy_rd_adjustment(int64_t original_rd, 
+                                           const uint16_t *src, int src_stride,
+                                           const uint16_t *pred, int pred_stride,
+                                           BLOCK_SIZE bsize, double psy_rd_strength) {
+  if (psy_rd_strength <= 0.0) return original_rd;
+  
+  const int block_size = 4 << b_width_log2_lookup[bsize];
+  const int64_t psy_cost = vp9_highbd_calculate_psy_rd_cost(src, src_stride,
+                                                            pred, pred_stride,
+                                                            block_size, psy_rd_strength);
+  
+  return original_rd + psy_cost;
+}
+#endif  // CONFIG_VP9_HIGHBITDEPTH
+
+// Adaptive function that dispatches to appropriate bit depth version
+int64_t vp9_adaptive_apply_psy_rd_adjustment(int64_t original_rd,
+                                             const struct macroblock *x,
+                                             const struct macroblockd *xd,
+                                             BLOCK_SIZE bsize, double psy_rd_strength) {
+  if (psy_rd_strength <= 0.0) return original_rd;
+  
+  const uint8_t *src = x->plane[0].src.buf;
+  const int src_stride = x->plane[0].src.stride;
+  const uint8_t *pred = xd->plane[0].dst.buf;
+  const int pred_stride = xd->plane[0].dst.stride;
+  
+#if CONFIG_VP9_HIGHBITDEPTH
+  if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) {
+    const uint16_t *src16 = CONVERT_TO_SHORTPTR(src);
+    const uint16_t *pred16 = CONVERT_TO_SHORTPTR(pred);
+    return vp9_highbd_apply_psy_rd_adjustment(original_rd, src16, src_stride, pred16, pred_stride, bsize, psy_rd_strength);
+  }
+#endif  // CONFIG_VP9_HIGHBITDEPTH
+  
+  return vp9_apply_psy_rd_adjustment(original_rd, src, src_stride, pred, pred_stride, bsize, psy_rd_strength);
 }
