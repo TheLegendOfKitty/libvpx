@@ -28,6 +28,8 @@ extern "C" {
 
 #define RDCOST(RM, DM, R, D) \
   ROUND_POWER_OF_TWO(((int64_t)(R)) * (RM), VP9_PROB_COST_SHIFT) + ((D) << (DM))
+#define RDCOST_PSY(RM, DM, R, D, PSY_COST) \
+  ROUND_POWER_OF_TWO(((int64_t)(R)) * (RM), VP9_PROB_COST_SHIFT) + ((D) << (DM)) + (PSY_COST)
 #define RDCOST_NEG_R(RM, DM, R, D) \
   ((D) << (DM)) - ROUND_POWER_OF_TWO(((int64_t)(R)) * (RM), VP9_PROB_COST_SHIFT)
 #define RDCOST_NEG_D(RM, DM, R, D) \
@@ -227,6 +229,22 @@ unsigned int vp9_high_get_sby_perpixel_variance(struct VP9_COMP *cpi,
 #endif
 
 void vp9_build_inter_mode_cost(struct VP9_COMP *cpi);
+
+// Psychovisual RD optimization functions
+uint64_t vp9_calculate_visual_energy(const uint8_t *src, int src_stride,
+                                     int block_size);
+uint64_t vp9_calculate_visual_energy_diff(const uint8_t *src, int src_stride,
+                                         const uint8_t *pred, int pred_stride,
+                                         int block_size);
+int64_t vp9_calculate_psy_rd_cost(const uint8_t *src, int src_stride,
+                                  const uint8_t *pred, int pred_stride,
+                                  int block_size, double psy_rd_strength);
+
+// Helper function to apply psy-rd adjustment to existing RD cost
+int64_t vp9_apply_psy_rd_adjustment(int64_t original_rd, 
+                                    const uint8_t *src, int src_stride,
+                                    const uint8_t *pred, int pred_stride,
+                                    BLOCK_SIZE bsize, double psy_rd_strength);
 
 #ifdef __cplusplus
 }  // extern "C"

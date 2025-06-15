@@ -470,6 +470,9 @@ static const arg_def_t min_gf_interval = ARG_DEF(
 static const arg_def_t max_gf_interval = ARG_DEF(
     NULL, "max-gf-interval", 1,
     "max gf/arf frame interval (default 0, indicating in-built behavior)");
+static const arg_def_t psy_rd = ARG_DEF(
+    NULL, "psy-rd", 1,
+    "Psychovisual RD optimization strength (0.0: off (default), 2.0: max)");
 
 static const struct arg_enum_list color_space_enum[] = {
   { "unknown", VPX_CS_UNKNOWN },
@@ -563,6 +566,7 @@ static const arg_def_t *vp9_args[] = { &cpu_used_vp9,
                                        &input_color_space,
                                        &min_gf_interval,
                                        &max_gf_interval,
+                                       &psy_rd,
                                        &target_level,
                                        &row_mt,
                                        &disable_loopfilter,
@@ -600,6 +604,7 @@ static const int vp9_arg_ctrl_map[] = { VP8E_SET_CPUUSED,
                                         VP9E_SET_COLOR_SPACE,
                                         VP9E_SET_MIN_GF_INTERVAL,
                                         VP9E_SET_MAX_GF_INTERVAL,
+                                        VP9E_SET_PSY_RD,
                                         VP9E_SET_TARGET_LEVEL,
                                         VP9E_SET_ROW_MT,
                                         VP9E_SET_DISABLE_LOOPFILTER,
@@ -688,6 +693,9 @@ struct stream_config {
   // whether to use 16bit internal buffers
   int use_16bit_internal;
 #endif
+  // VP9 psy-rd value (stored separately due to double type)
+  double psy_rd_value;
+  int psy_rd_set;
 };
 
 struct stream_state {
@@ -1079,6 +1087,16 @@ static int parse_stream_params(struct VpxEncoderConfig *global,
         test_16bit_internal = 1;
       }
 #endif
+    } else if (arg_match(&arg, &psy_rd, argi)) {
+      /* Special handling for psy_rd double argument */
+      if (strcmp(global->codec->name, "vp9") == 0) {
+        char *endptr;
+        config->psy_rd_value = strtod(arg.val, &endptr);
+        if (*endptr != '\0' || config->psy_rd_value < 0.0 || config->psy_rd_value > 2.0) {
+          die("Error: Invalid psy-rd value (%s). Must be between 0.0 and 2.0\n", arg.val);
+        }
+        config->psy_rd_set = 1;
+      }
     } else {
       int i, match = 0;
       for (i = 0; ctrl_args[i]; i++) {
@@ -1362,6 +1380,14 @@ static void initialize_encoder(struct stream_state *stream,
       fprintf(stderr, "Error: Tried to set control %d = %d\n", ctrl, value);
 
     ctx_exit_on_error(&stream->encoder, "Failed to control codec");
+  }
+
+  /* Set psy-rd control if specified */
+  if (stream->config.psy_rd_set) {
+    if (vpx_codec_control_(&stream->encoder, VP9E_SET_PSY_RD, stream->config.psy_rd_value))
+      fprintf(stderr, "Error: Tried to set VP9E_SET_PSY_RD = %f\n", stream->config.psy_rd_value);
+
+    ctx_exit_on_error(&stream->encoder, "Failed to set psy-rd control");
   }
 
 #if CONFIG_DECODERS

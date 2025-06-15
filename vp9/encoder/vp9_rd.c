@@ -21,6 +21,7 @@
 #include "vpx_ports/system_state.h"
 
 #include "vp9/common/vp9_common.h"
+#include "vp9/common/vp9_common_data.h"
 #include "vp9/common/vp9_entropy.h"
 #include "vp9/common/vp9_entropymode.h"
 #include "vp9/common/vp9_mvref_common.h"
@@ -817,4 +818,68 @@ uint64_t vp9_block_diff_sse_c(const uint8_t *src, int src_stride,
     }
   }
   return sse;
+}
+
+// Psychovisual RD optimization functions
+uint64_t vp9_calculate_visual_energy(const uint8_t *src, int src_stride,
+                                     int block_size) {
+  uint64_t energy = 0;
+  
+  // Calculate horizontal gradients
+  for (int i = 0; i < block_size; i++) {
+    for (int j = 0; j < block_size - 1; j++) {
+      const int grad = src[i * src_stride + j + 1] - src[i * src_stride + j];
+      energy += (uint64_t)(grad * grad);
+    }
+  }
+  
+  // Calculate vertical gradients
+  for (int i = 0; i < block_size - 1; i++) {
+    for (int j = 0; j < block_size; j++) {
+      const int grad = src[(i + 1) * src_stride + j] - src[i * src_stride + j];
+      energy += (uint64_t)(grad * grad);
+    }
+  }
+  
+  return energy;
+}
+
+uint64_t vp9_calculate_visual_energy_diff(const uint8_t *src, int src_stride,
+                                         const uint8_t *pred, int pred_stride,
+                                         int block_size) {
+  const uint64_t src_energy = vp9_calculate_visual_energy(src, src_stride, block_size);
+  const uint64_t pred_energy = vp9_calculate_visual_energy(pred, pred_stride, block_size);
+  
+  // Return absolute difference in visual energy
+  return (src_energy > pred_energy) ? (src_energy - pred_energy) : (pred_energy - src_energy);
+}
+
+int64_t vp9_calculate_psy_rd_cost(const uint8_t *src, int src_stride,
+                                  const uint8_t *pred, int pred_stride,
+                                  int block_size, double psy_rd_strength) {
+  if (psy_rd_strength <= 0.0) return 0;
+  
+  const uint64_t energy_diff = vp9_calculate_visual_energy_diff(src, src_stride, 
+                                                               pred, pred_stride, 
+                                                               block_size);
+  
+  // Scale the energy difference by psy-rd strength
+  // Use a logarithmic scaling to avoid overwhelming the RD cost
+  const double scaled_energy = psy_rd_strength * sqrt(energy_diff);
+  
+  return (int64_t)(scaled_energy);
+}
+
+int64_t vp9_apply_psy_rd_adjustment(int64_t original_rd, 
+                                    const uint8_t *src, int src_stride,
+                                    const uint8_t *pred, int pred_stride,
+                                    BLOCK_SIZE bsize, double psy_rd_strength) {
+  if (psy_rd_strength <= 0.0) return original_rd;
+  
+  const int block_size = 4 << b_width_log2_lookup[bsize];
+  const int64_t psy_cost = vp9_calculate_psy_rd_cost(src, src_stride,
+                                                     pred, pred_stride,
+                                                     block_size, psy_rd_strength);
+  
+  return original_rd + psy_cost;
 }

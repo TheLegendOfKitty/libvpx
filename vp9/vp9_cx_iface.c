@@ -70,6 +70,7 @@ typedef struct vp9_extracfg {
   unsigned int row_mt;
   unsigned int motion_vector_unit_test;
   int delta_q_uv;
+  double psy_rd;
 } vp9_extracfg;
 
 static struct vp9_extracfg default_extra_cfg = {
@@ -110,6 +111,7 @@ static struct vp9_extracfg default_extra_cfg = {
   0,                     // row_mt
   0,                     // motion_vector_unit_test
   0,                     // delta_q_uv
+  0.0,                   // psy_rd
 };
 
 struct vpx_codec_alg_priv {
@@ -647,6 +649,7 @@ static vpx_codec_err_t set_encoder_config(
   oxcf->motion_vector_unit_test = extra_cfg->motion_vector_unit_test;
 
   oxcf->delta_q_uv = extra_cfg->delta_q_uv;
+  oxcf->psy_rd = extra_cfg->psy_rd;
 
   for (sl = 0; sl < oxcf->ss_number_layers; ++sl) {
     for (tl = 0; tl < oxcf->ts_number_layers; ++tl) {
@@ -1985,6 +1988,15 @@ static vpx_codec_err_t ctrl_set_delta_q_uv(vpx_codec_alg_priv_t *ctx,
   return update_extra_cfg(ctx, &extra_cfg);
 }
 
+static vpx_codec_err_t ctrl_set_psy_rd(vpx_codec_alg_priv_t *ctx,
+                                       va_list args) {
+  struct vp9_extracfg extra_cfg = ctx->extra_cfg;
+  double data = va_arg(args, double);
+  if (data < 0.0 || data > 2.0) return VPX_CODEC_INVALID_PARAM;
+  extra_cfg.psy_rd = data;
+  return update_extra_cfg(ctx, &extra_cfg);
+}
+
 static vpx_codec_err_t ctrl_register_cx_callback(vpx_codec_alg_priv_t *ctx,
                                                  va_list args) {
   vpx_codec_priv_output_cx_pkt_cb_pair_t *cbp =
@@ -2163,6 +2175,7 @@ static vpx_codec_ctrl_fn_map_t encoder_ctrl_maps[] = {
   { VP9E_SET_SVC_GF_TEMPORAL_REF, ctrl_set_svc_gf_temporal_ref },
   { VP9E_SET_SVC_SPATIAL_LAYER_SYNC, ctrl_set_svc_spatial_layer_sync },
   { VP9E_SET_DELTA_Q_UV, ctrl_set_delta_q_uv },
+  { VP9E_SET_PSY_RD, ctrl_set_psy_rd },
   { VP9E_SET_DISABLE_LOOPFILTER, ctrl_set_disable_loopfilter },
   { VP9E_SET_RTC_EXTERNAL_RATECTRL, ctrl_set_rtc_external_ratectrl },
   { VP9E_SET_EXTERNAL_RATE_CONTROL, ctrl_set_external_rate_control },

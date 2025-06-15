@@ -690,6 +690,15 @@ enum vp8e_enc_control_id {
    * Supported in codecs: VP9
    */
   VP9E_SET_DELTA_Q_UV,
+  
+  /*!\brief Codec control function to set psychovisual RD optimization strength.
+   *
+   * Higher values favor visual energy preservation over traditional RD optimization.
+   * Valid range: 0.0 (off) to 2.0 (maximum), default is 0.0.
+   *
+   * Supported in codecs: VP9
+   */
+  VP9E_SET_PSY_RD,
 
   /*!\brief Codec control function to disable increase Q on overshoot in CBR.
    *
@@ -1090,6 +1099,8 @@ VPX_CTRL_USE_TYPE(VP9E_SET_POSTENCODE_DROP, unsigned int)
 #define VPX_CTRL_VP9E_SET_POSTENCODE_DROP
 VPX_CTRL_USE_TYPE(VP9E_SET_DELTA_Q_UV, int)
 #define VPX_CTRL_VP9E_SET_DELTA_Q_UV
+VPX_CTRL_USE_TYPE(VP9E_SET_PSY_RD, double)
+#define VPX_CTRL_VP9E_SET_PSY_RD
 VPX_CTRL_USE_TYPE(VP9E_SET_DISABLE_OVERSHOOT_MAXQ_CBR, int)
 #define VPX_CTRL_VP9E_SET_DISABLE_OVERSHOOT_MAXQ_CBR
 VPX_CTRL_USE_TYPE(VP9E_SET_DISABLE_LOOPFILTER, int)
