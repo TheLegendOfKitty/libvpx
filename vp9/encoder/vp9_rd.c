@@ -869,36 +869,6 @@ uint64_t vp9_highbd_calculate_visual_energy(const uint16_t *src, int src_stride,
 }
 #endif  // CONFIG_VP9_HIGHBITDEPTH
 
-uint64_t vp9_calculate_grain_temporal_cost(const uint8_t *src, int src_stride,
-                                          const uint8_t *ref, int ref_stride,
-                                          int block_size) {
-  if (!ref) return 0;  // No reference available
-  
-  uint64_t temporal_cost = 0;
-  
-  // Calculate grain pattern correlation between current and reference blocks
-  // Focus on high-frequency components that represent grain
-  for (int i = 1; i < block_size - 1; i++) {
-    for (int j = 1; j < block_size - 1; j++) {
-      // Calculate local gradient (grain indicator) in source
-      const int src_grad_x = src[i * src_stride + j + 1] - src[i * src_stride + j - 1];
-      const int src_grad_y = src[(i + 1) * src_stride + j] - src[(i - 1) * src_stride + j];
-      const int src_grain = abs(src_grad_x) + abs(src_grad_y);
-      
-      // Calculate local gradient (grain indicator) in reference
-      const int ref_grad_x = ref[i * ref_stride + j + 1] - ref[i * ref_stride + j - 1];
-      const int ref_grad_y = ref[(i + 1) * ref_stride + j] - ref[(i - 1) * ref_stride + j];
-      const int ref_grain = abs(ref_grad_x) + abs(ref_grad_y);
-      
-      // Penalize grain discontinuity (grain appearing or disappearing)
-      const int grain_diff = abs(src_grain - ref_grain);
-      temporal_cost += (uint64_t)(grain_diff * grain_diff);
-    }
-  }
-  
-  return temporal_cost;
-}
-
 uint64_t vp9_calculate_visual_energy_diff(const uint8_t *src, int src_stride,
                                          const uint8_t *pred, int pred_stride,
                                          int block_size) {
@@ -910,36 +880,6 @@ uint64_t vp9_calculate_visual_energy_diff(const uint8_t *src, int src_stride,
 }
 
 #if CONFIG_VP9_HIGHBITDEPTH
-uint64_t vp9_highbd_calculate_grain_temporal_cost(const uint16_t *src, int src_stride,
-                                                  const uint16_t *ref, int ref_stride,
-                                                  int block_size) {
-  if (!ref) return 0;  // No reference available
-  
-  uint64_t temporal_cost = 0;
-  
-  // Calculate grain pattern correlation between current and reference blocks
-  // Focus on high-frequency components that represent grain
-  for (int i = 1; i < block_size - 1; i++) {
-    for (int j = 1; j < block_size - 1; j++) {
-      // Calculate local gradient (grain indicator) in source
-      const int src_grad_x = src[i * src_stride + j + 1] - src[i * src_stride + j - 1];
-      const int src_grad_y = src[(i + 1) * src_stride + j] - src[(i - 1) * src_stride + j];
-      const int src_grain = abs(src_grad_x) + abs(src_grad_y);
-      
-      // Calculate local gradient (grain indicator) in reference
-      const int ref_grad_x = ref[i * ref_stride + j + 1] - ref[i * ref_stride + j - 1];
-      const int ref_grad_y = ref[(i + 1) * ref_stride + j] - ref[(i - 1) * ref_stride + j];
-      const int ref_grain = abs(ref_grad_x) + abs(ref_grad_y);
-      
-      // Penalize grain discontinuity (grain appearing or disappearing)
-      const int grain_diff = abs(src_grain - ref_grain);
-      temporal_cost += (uint64_t)(grain_diff * grain_diff);
-    }
-  }
-  
-  return temporal_cost;
-}
-
 uint64_t vp9_highbd_calculate_visual_energy_diff(const uint16_t *src, int src_stride,
                                                  const uint16_t *pred, int pred_stride,
                                                  int block_size) {
@@ -951,73 +891,37 @@ uint64_t vp9_highbd_calculate_visual_energy_diff(const uint16_t *src, int src_st
 }
 #endif  // CONFIG_VP9_HIGHBITDEPTH
 
-int64_t vp9_calculate_psy_rd_cost_with_temporal(const uint8_t *src, int src_stride,
-                                               const uint8_t *pred, int pred_stride,
-                                               const uint8_t *ref, int ref_stride,
-                                               int block_size, double psy_rd_strength) {
+int64_t vp9_calculate_psy_rd_cost(const uint8_t *src, int src_stride,
+                                  const uint8_t *pred, int pred_stride,
+                                  int block_size, double psy_rd_strength) {
   if (psy_rd_strength <= 0.0) return 0;
   
   const uint64_t energy_diff = vp9_calculate_visual_energy_diff(src, src_stride, 
                                                                pred, pred_stride, 
                                                                block_size);
   
-  // Calculate temporal grain cost to penalize grain discontinuities
-  const uint64_t grain_temporal_cost = vp9_calculate_grain_temporal_cost(src, src_stride,
-                                                                         ref, ref_stride,
-                                                                         block_size);
-  
-  // Combine spatial and temporal costs
-  // Temporal grain consistency weighted at 30% of spatial energy cost
-  const double total_cost = energy_diff + 0.3 * grain_temporal_cost;
-  
-  // Scale the combined cost by psy-rd strength
+  // Scale the energy difference by psy-rd strength
   // Use a logarithmic scaling to avoid overwhelming the RD cost
-  const double scaled_energy = psy_rd_strength * sqrt(total_cost);
+  const double scaled_energy = psy_rd_strength * sqrt(energy_diff);
   
   return (int64_t)(scaled_energy);
 }
 
-// Backward compatibility wrapper - uses only spatial cost
-int64_t vp9_calculate_psy_rd_cost(const uint8_t *src, int src_stride,
-                                  const uint8_t *pred, int pred_stride,
-                                  int block_size, double psy_rd_strength) {
-  return vp9_calculate_psy_rd_cost_with_temporal(src, src_stride, pred, pred_stride,
-                                                NULL, 0, block_size, psy_rd_strength);
-}
-
 #if CONFIG_VP9_HIGHBITDEPTH
-int64_t vp9_highbd_calculate_psy_rd_cost_with_temporal(const uint16_t *src, int src_stride,
-                                                       const uint16_t *pred, int pred_stride,
-                                                       const uint16_t *ref, int ref_stride,
-                                                       int block_size, double psy_rd_strength) {
+int64_t vp9_highbd_calculate_psy_rd_cost(const uint16_t *src, int src_stride,
+                                         const uint16_t *pred, int pred_stride,
+                                         int block_size, double psy_rd_strength) {
   if (psy_rd_strength <= 0.0) return 0;
   
   const uint64_t energy_diff = vp9_highbd_calculate_visual_energy_diff(src, src_stride, 
                                                                       pred, pred_stride, 
                                                                       block_size);
   
-  // Calculate temporal grain cost to penalize grain discontinuities
-  const uint64_t grain_temporal_cost = vp9_highbd_calculate_grain_temporal_cost(src, src_stride,
-                                                                               ref, ref_stride,
-                                                                               block_size);
-  
-  // Combine spatial and temporal costs
-  // Temporal grain consistency weighted at 30% of spatial energy cost
-  const double total_cost = energy_diff + 0.3 * grain_temporal_cost;
-  
-  // Scale the combined cost by psy-rd strength
+  // Scale the energy difference by psy-rd strength
   // Use a logarithmic scaling to avoid overwhelming the RD cost
-  const double scaled_energy = psy_rd_strength * sqrt(total_cost);
+  const double scaled_energy = psy_rd_strength * sqrt(energy_diff);
   
   return (int64_t)(scaled_energy);
-}
-
-// Backward compatibility wrapper - uses only spatial cost
-int64_t vp9_highbd_calculate_psy_rd_cost(const uint16_t *src, int src_stride,
-                                         const uint16_t *pred, int pred_stride,
-                                         int block_size, double psy_rd_strength) {
-  return vp9_highbd_calculate_psy_rd_cost_with_temporal(src, src_stride, pred, pred_stride,
-                                                       NULL, 0, block_size, psy_rd_strength);
 }
 #endif  // CONFIG_VP9_HIGHBITDEPTH
 
@@ -1063,33 +967,13 @@ int64_t vp9_adaptive_apply_psy_rd_adjustment(int64_t original_rd,
   const uint8_t *pred = xd->plane[0].dst.buf;
   const int pred_stride = xd->plane[0].dst.stride;
   
-  // Get reference frame data for temporal grain analysis
-  const uint8_t *ref = NULL;
-  int ref_stride = 0;
-  if (xd->plane[0].pre[0].buf) {
-    ref = xd->plane[0].pre[0].buf;
-    ref_stride = xd->plane[0].pre[0].stride;
-  }
-  
-  const int block_size = 4 << b_width_log2_lookup[bsize];
-  
 #if CONFIG_VP9_HIGHBITDEPTH
   if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) {
     const uint16_t *src16 = CONVERT_TO_SHORTPTR(src);
     const uint16_t *pred16 = CONVERT_TO_SHORTPTR(pred);
-    const uint16_t *ref16 = ref ? CONVERT_TO_SHORTPTR(ref) : NULL;
-    
-    const int64_t psy_cost = vp9_highbd_calculate_psy_rd_cost_with_temporal(src16, src_stride,
-                                                                           pred16, pred_stride,
-                                                                           ref16, ref_stride,
-                                                                           block_size, psy_rd_strength);
-    return original_rd + psy_cost;
+    return vp9_highbd_apply_psy_rd_adjustment(original_rd, src16, src_stride, pred16, pred_stride, bsize, psy_rd_strength);
   }
 #endif  // CONFIG_VP9_HIGHBITDEPTH
   
-  const int64_t psy_cost = vp9_calculate_psy_rd_cost_with_temporal(src, src_stride,
-                                                                  pred, pred_stride,
-                                                                  ref, ref_stride,
-                                                                  block_size, psy_rd_strength);
-  return original_rd + psy_cost;
+  return vp9_apply_psy_rd_adjustment(original_rd, src, src_stride, pred, pred_stride, bsize, psy_rd_strength);
 }

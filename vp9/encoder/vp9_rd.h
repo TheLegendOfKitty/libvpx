@@ -236,16 +236,9 @@ uint64_t vp9_calculate_visual_energy(const uint8_t *src, int src_stride,
 uint64_t vp9_calculate_visual_energy_diff(const uint8_t *src, int src_stride,
                                          const uint8_t *pred, int pred_stride,
                                          int block_size);
-uint64_t vp9_calculate_grain_temporal_cost(const uint8_t *src, int src_stride,
-                                          const uint8_t *ref, int ref_stride,
-                                          int block_size);
 int64_t vp9_calculate_psy_rd_cost(const uint8_t *src, int src_stride,
                                   const uint8_t *pred, int pred_stride,
                                   int block_size, double psy_rd_strength);
-int64_t vp9_calculate_psy_rd_cost_with_temporal(const uint8_t *src, int src_stride,
-                                               const uint8_t *pred, int pred_stride,
-                                               const uint8_t *ref, int ref_stride,
-                                               int block_size, double psy_rd_strength);
 
 // Helper function to apply psy-rd adjustment to existing RD cost
 int64_t vp9_apply_psy_rd_adjustment(int64_t original_rd, 
@@ -260,16 +253,9 @@ uint64_t vp9_highbd_calculate_visual_energy(const uint16_t *src, int src_stride,
 uint64_t vp9_highbd_calculate_visual_energy_diff(const uint16_t *src, int src_stride,
                                                  const uint16_t *pred, int pred_stride,
                                                  int block_size);
-uint64_t vp9_highbd_calculate_grain_temporal_cost(const uint16_t *src, int src_stride,
-                                                  const uint16_t *ref, int ref_stride,
-                                                  int block_size);
 int64_t vp9_highbd_calculate_psy_rd_cost(const uint16_t *src, int src_stride,
                                          const uint16_t *pred, int pred_stride,
                                          int block_size, double psy_rd_strength);
-int64_t vp9_highbd_calculate_psy_rd_cost_with_temporal(const uint16_t *src, int src_stride,
-                                                       const uint16_t *pred, int pred_stride,
-                                                       const uint16_t *ref, int ref_stride,
-                                                       int block_size, double psy_rd_strength);
 int64_t vp9_highbd_apply_psy_rd_adjustment(int64_t original_rd, 
                                            const uint16_t *src, int src_stride,
                                            const uint16_t *pred, int pred_stride,
