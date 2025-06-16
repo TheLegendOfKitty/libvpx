@@ -88,6 +88,7 @@
 #include "vp9/encoder/vp9_svc_layercontext.h"
 #include "vp9/encoder/vp9_temporal_filter.h"
 #include "vp9/encoder/vp9_tpl_model.h"
+#include "vp9/encoder/vp9_visual_energy.h" // For vp9_calculate_visual_energy
 #include "vp9/vp9_cx_iface.h"
 
 #define AM_SEGMENT_ID_INACTIVE 7
@@ -1027,6 +1028,9 @@ static void dealloc_compressor_data(VP9_COMP *cpi) {
 
   vpx_free(cpi->mi_ssim_rdmult_scaling_factors);
   cpi->mi_ssim_rdmult_scaling_factors = NULL;
+
+  vpx_free(cpi->visual_energy_map); // Deallocate visual_energy_map
+  cpi->visual_energy_map = NULL;     // Set to NULL after freeing
 
   vp9_free_ref_frame_buffers(cm->buffer_pool);
 #if CONFIG_VP9_POSTPROC
@@ -2431,6 +2435,7 @@ VP9_COMP *vp9_create_compressor(const VP9EncoderConfig *oxcf,
   if (!cm) return NULL;
 
   vp9_zero(*cpi);
+  cpi->visual_energy_map = NULL; // Initialize visual_energy_map
 
   if (setjmp(cm->error.jmp)) {
     cm->error.setjmp = 0;
@@ -4121,6 +4126,45 @@ static int encode_without_recode_loop(VP9_COMP *cpi, size_t *size,
 #endif
   }
 
+  // Calculate visual energy map for the current source
+  if (cpi->oxcf.enable_psy_rd) {
+    if (cpi->Source) {
+      vp9_calculate_visual_energy(cpi, cpi->Source);
+      // Calculate average visual energy and store in rc
+      if (cpi->visual_energy_map) {
+        const int block_w_pixels = block_size_wide[VISUAL_ENERGY_BLOCK_SIZE];
+        const int block_h_pixels = block_size_high[VISUAL_ENERGY_BLOCK_SIZE];
+        const int source_w = cpi->Source->y_crop_width;
+        const int source_h = cpi->Source->y_crop_height;
+        const int map_width = (source_w + block_w_pixels - 1) / block_w_pixels;
+        const int map_height = (source_h + block_h_pixels - 1) / block_h_pixels;
+        const int map_size = map_width * map_height;
+        if (map_size > 0) {
+          uint64_t sum_visual_energy = 0;
+          int i;
+          for (i = 0; i < map_size; ++i) {
+            sum_visual_energy += cpi->visual_energy_map[i];
+          }
+          cpi->rc.avg_visual_energy = (double)sum_visual_energy / map_size;
+        } else {
+          cpi->rc.avg_visual_energy = 0.0;
+        }
+      } else {
+        cpi->rc.avg_visual_energy = 0.0;
+      }
+    } else {
+      cpi->rc.avg_visual_energy = 0.0;
+    }
+  } else {
+    // Ensure avg_visual_energy is neutral if psy-rd is disabled
+    cpi->rc.avg_visual_energy = 0.0;
+    // Also ensure the map itself is NULL if not calculated
+    if (cpi->visual_energy_map) {
+        vpx_free(cpi->visual_energy_map);
+        cpi->visual_energy_map = NULL;
+    }
+  }
+
   if ((cpi->use_svc &&
        (svc->spatial_layer_id < svc->number_spatial_layers - 1 ||
         svc->temporal_layer_id < svc->number_temporal_layers - 1 ||
@@ -4497,6 +4541,11 @@ static void encode_with_recode_loop(VP9_COMP *cpi, size_t *size, uint8_t *dest,
       cpi->raw_source_frame = cpi->Source;
 #endif
     }
+
+  // Calculate visual energy map for the current source
+  if (cpi->Source) {
+    vp9_calculate_visual_energy(cpi, cpi->Source);
+  }
 
     if (cpi->unscaled_last_source != NULL)
       cpi->Last_Source = vp9_scale_if_required(cm, cpi->unscaled_last_source,

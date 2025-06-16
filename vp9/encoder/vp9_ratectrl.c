@@ -843,6 +843,32 @@ int vp9_rc_regulate_q(const VP9_COMP *cpi, int target_bits_per_frame,
   target_bits_per_mb =
       (int)(((uint64_t)target_bits_per_frame << BPER_MB_NORMBITS) / cm->MBs);
 
+  // Adjust active_best_quality and active_worst_quality based on visual energy
+  if (cpi->oxcf.enable_psy_rd && cpi->rc.avg_visual_energy > 0) {
+    // energy_factor: 1.0 (low energy) to 0.75 (high energy)
+    // This means for high energy, we are willing to pick a better quality (lower Q)
+    // by making active_best_quality and active_worst_quality lower.
+    double energy_factor = 1.0 - (cpi->rc.avg_visual_energy / 255.0) * 0.25;
+
+    int initial_active_best = active_best_quality;
+    int initial_active_worst = active_worst_quality;
+
+    active_best_quality = (int)(active_best_quality * energy_factor);
+    active_best_quality = clamp(active_best_quality, rc->best_quality, initial_active_worst); // Clamp against initial_active_worst
+
+    active_worst_quality = (int)(active_worst_quality * energy_factor);
+    active_worst_quality = clamp(active_worst_quality, rc->best_quality, rc->worst_quality);
+
+    // Ensure active_worst_quality is not less than the new active_best_quality
+    if (active_worst_quality < active_best_quality) {
+      active_worst_quality = VPXMAX(initial_active_worst, active_best_quality);
+      active_worst_quality = clamp(active_worst_quality, active_best_quality, rc->worst_quality);
+    }
+     // And active_best_quality is not more than new active_worst_quality (already handled by clamp against initial_active_worst)
+    active_best_quality = VPXMIN(active_best_quality, active_worst_quality);
+
+  }
+
   i = active_best_quality;
 
   do {

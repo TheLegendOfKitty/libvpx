@@ -34,6 +34,7 @@
 #if !CONFIG_REALTIME_ONLY
 #include "vp9/encoder/vp9_aq_variance.h"
 #endif
+#include "vp9/encoder/vp9_visual_energy.h" // Added for visual energy
 #include "vp9/encoder/vp9_cost.h"
 #include "vp9/encoder/vp9_encodemb.h"
 #include "vp9/encoder/vp9_encodemv.h"
@@ -55,6 +56,21 @@
 
 #define MIN_EARLY_TERM_INDEX 3
 #define NEW_MV_DISCOUNT_FACTOR 8
+
+// Helper function to apply visual energy weighting to distortion
+static VPX_INLINE int64_t vp9_apply_visual_energy_weight(int64_t distortion,
+                                                         int visual_energy) {
+  if (visual_energy == 0) return distortion; // No change if visual energy is zero
+  // Applying a positive weight for higher visual energy,
+  // potentially making distortion seem higher for areas with more energy.
+  // The formula might need tuning. A common approach is to reduce distortion
+  // for low energy areas, or increase rate for high energy areas.
+  // Current placeholder: increase perceived distortion for higher energy.
+  // Example: distortion * (1.0 + visual_energy / 255.0)
+  // For fixed point, ensure calculations avoid float or are scaled appropriately.
+  // This example uses float for simplicity of expression.
+  return (int64_t)(distortion * (1.0 + (double)visual_energy / 255.0));
+}
 
 typedef struct {
   PREDICTION_MODE mode;
@@ -817,6 +833,8 @@ static void block_rd_txfm(int plane, int block, int blk_row, int blk_col,
     }
   }
 
+  // Apply visual energy weighting before RDCOST
+  dist = vp9_apply_visual_energy_weight(dist, (args->cpi->oxcf.enable_psy_rd ? args->x->visual_energy : 0));
   rd = RDCOST(x->rdmult, x->rddiv, 0, dist);
   if (args->this_rd + rd > args->best_rd) {
     args->exit_early = 1;
@@ -826,8 +844,10 @@ static void block_rd_txfm(int plane, int block, int blk_row, int blk_col,
   rate = rate_block(plane, block, tx_size, coeff_ctx, args);
   args->t_above[blk_col] = (x->plane[plane].eobs[block] > 0) ? 1 : 0;
   args->t_left[blk_row] = (x->plane[plane].eobs[block] > 0) ? 1 : 0;
-  rd1 = RDCOST(x->rdmult, x->rddiv, rate, dist);
-  rd2 = RDCOST(x->rdmult, x->rddiv, 0, sse);
+  // Note: dist was already weighted.
+  // Depending on strategy, sse could also be weighted if rd2 path is taken.
+  rd1 = RDCOST(x->rdmult, x->rddiv, rate, dist); // dist is already weighted
+  rd2 = RDCOST(x->rdmult, x->rddiv, 0, vp9_apply_visual_energy_weight(sse, (args->cpi->oxcf.enable_psy_rd ? args->x->visual_energy : 0)));
 
   // TODO(jingning): temporarily enabled only for luma component
   rd = VPXMIN(rd1, rd2);
@@ -1137,7 +1157,7 @@ static int64_t rd_pick_intra4x4block(VP9_COMP *cpi, MACROBLOCK *x, int row,
             ratey += cost_coeffs(x, 0, block, TX_4X4, coeff_ctx, so->scan,
                                  so->neighbors, cpi->sf.use_fast_coef_costing);
             tempa[idx] = templ[idy] = (x->plane[0].eobs[block] > 0 ? 1 : 0);
-            if (RDCOST(x->rdmult, x->rddiv, ratey, distortion) >= best_rd)
+            if (RDCOST(x->rdmult, x->rddiv, ratey, vp9_apply_visual_energy_weight(distortion, (cpi->oxcf.enable_psy_rd ? x->visual_energy : 0))) >= best_rd)
               goto next_highbd;
             vp9_highbd_iwht4x4_add(BLOCK_OFFSET(pd->dqcoeff, block), dst16,
                                    dst_stride, p->eobs[block], xd->bd);
@@ -1160,7 +1180,7 @@ static int64_t rd_pick_intra4x4block(VP9_COMP *cpi, MACROBLOCK *x, int row,
                               &unused, xd->bd) >>
                           2;
             tempa[idx] = templ[idy] = (x->plane[0].eobs[block] > 0 ? 1 : 0);
-            if (RDCOST(x->rdmult, x->rddiv, ratey, distortion) >= best_rd)
+            if (RDCOST(x->rdmult, x->rddiv, ratey, vp9_apply_visual_energy_weight(distortion, (cpi->oxcf.enable_psy_rd ? x->visual_energy : 0))) >= best_rd)
               goto next_highbd;
             vp9_highbd_iht4x4_add(tx_type, BLOCK_OFFSET(pd->dqcoeff, block),
                                   dst16, dst_stride, p->eobs[block], xd->bd);
@@ -1169,12 +1189,12 @@ static int64_t rd_pick_intra4x4block(VP9_COMP *cpi, MACROBLOCK *x, int row,
       }
 
       rate += ratey;
-      this_rd = RDCOST(x->rdmult, x->rddiv, rate, distortion);
+      this_rd = RDCOST(x->rdmult, x->rddiv, rate, vp9_apply_visual_energy_weight(distortion, (cpi->oxcf.enable_psy_rd ? x->visual_energy : 0)));
 
       if (this_rd < best_rd) {
         *bestrate = rate;
-        *bestratey = ratey;
-        *bestdistortion = distortion;
+        // Store the weighted distortion
+        *bestdistortion = vp9_apply_visual_energy_weight(distortion, (cpi->oxcf.enable_psy_rd ? x->visual_energy : 0));
         best_rd = this_rd;
         *best_mode = mode;
         memcpy(a, tempa, num_4x4_blocks_wide * sizeof(tempa[0]));
@@ -1184,11 +1204,22 @@ static int64_t rd_pick_intra4x4block(VP9_COMP *cpi, MACROBLOCK *x, int row,
                  CONVERT_TO_SHORTPTR(dst_init + idy * dst_stride),
                  num_4x4_blocks_wide * 4 * sizeof(uint16_t));
         }
+      } else {
+        // Ensure *bestdistortion is updated even if this mode is not better,
+        // if it's the first one, or for consistency if required elsewhere.
+        // However, standard practice is to only update *bestdistortion if this_rd < best_rd.
+        // The original code only updated *bestdistortion if this_rd < best_rd.
+        // Let's keep that behavior for now, but ensure the *distortion* value being compared
+        // and potentially stored is the weighted one.
+        // The *bestdistortion assignment should reflect the distortion component of the best_rd.
+        // So if this_rd is not better, *bestdistortion should not be updated from this path.
       }
     next_highbd : {}
     }
     if (best_rd >= rd_thresh || x->skip_encode) return best_rd;
 
+    // *bestdistortion here should be the one that yielded best_rd.
+    // If best_rd was updated, *bestdistortion was updated with the weighted value.
     for (idy = 0; idy < num_4x4_blocks_high * 4; ++idy) {
       memcpy(CONVERT_TO_SHORTPTR(dst_init + idy * dst_stride),
              best_dst16 + idy * 8, num_4x4_blocks_wide * 4 * sizeof(uint16_t));
@@ -1241,8 +1272,8 @@ static int64_t rd_pick_intra4x4block(VP9_COMP *cpi, MACROBLOCK *x, int row,
                          so);
           ratey += cost_coeffs(x, 0, block, TX_4X4, coeff_ctx, so->scan,
                                so->neighbors, cpi->sf.use_fast_coef_costing);
-          tempa[idx] = templ[idy] = (x->plane[0].eobs[block] > 0) ? 1 : 0;
-          if (RDCOST(x->rdmult, x->rddiv, ratey, distortion) >= best_rd)
+          tempa[idx] = templ[idy] = (x->plane[0].eobs[block] > 0 ? 1 : 0);
+          if (RDCOST(x->rdmult, x->rddiv, ratey, vp9_apply_visual_energy_weight(distortion, (cpi->oxcf.enable_psy_rd ? x->visual_energy : 0))) >= best_rd)
             goto next;
           vp9_iwht4x4_add(BLOCK_OFFSET(pd->dqcoeff, block), dst, dst_stride,
                           p->eobs[block]);
@@ -1261,7 +1292,7 @@ static int64_t rd_pick_intra4x4block(VP9_COMP *cpi, MACROBLOCK *x, int row,
           distortion += vp9_block_error(coeff, BLOCK_OFFSET(pd->dqcoeff, block),
                                         16, &unused) >>
                         2;
-          if (RDCOST(x->rdmult, x->rddiv, ratey, distortion) >= best_rd)
+          if (RDCOST(x->rdmult, x->rddiv, ratey, vp9_apply_visual_energy_weight(distortion, (cpi->oxcf.enable_psy_rd ? x->visual_energy : 0))) >= best_rd)
             goto next;
           vp9_iht4x4_add(tx_type, BLOCK_OFFSET(pd->dqcoeff, block), dst,
                          dst_stride, p->eobs[block]);
@@ -1270,30 +1301,42 @@ static int64_t rd_pick_intra4x4block(VP9_COMP *cpi, MACROBLOCK *x, int row,
     }
 
     rate += ratey;
-    this_rd = RDCOST(x->rdmult, x->rddiv, rate, distortion);
+    this_rd = RDCOST(x->rdmult, x->rddiv, rate, vp9_apply_visual_energy_weight(distortion, (cpi->oxcf.enable_psy_rd ? x->visual_energy : 0)));
 
     if (this_rd < best_rd) {
       *bestrate = rate;
       *bestratey = ratey;
-      *bestdistortion = distortion;
+      // Store the weighted distortion
+      *bestdistortion = vp9_apply_visual_energy_weight(distortion, (cpi->oxcf.enable_psy_rd ? x->visual_energy : 0));
       best_rd = this_rd;
       *best_mode = mode;
       memcpy(a, tempa, num_4x4_blocks_wide * sizeof(tempa[0]));
-      memcpy(l, templ, num_4x4_blocks_high * sizeof(templ[0]));
-      for (idy = 0; idy < num_4x4_blocks_high * 4; ++idy)
-        memcpy(best_dst + idy * 8, dst_init + idy * dst_stride,
-               num_4x4_blocks_wide * 4);
+        *bestratey = ratey;
+        *bestdistortion = distortion;
+        best_rd = this_rd;
+        *best_mode = mode;
+        // Store the weighted distortion
+        *bestdistortion = vp9_apply_visual_energy_weight(distortion, x->visual_energy);
+        best_rd = this_rd;
+        *best_mode = mode;
+        memcpy(a, tempa, num_4x4_blocks_wide * sizeof(tempa[0]));
+        memcpy(l, templ, num_4x4_blocks_high * sizeof(templ[0]));
+        for (idy = 0; idy < num_4x4_blocks_high * 4; ++idy)
+          memcpy(best_dst + idy * 8, dst_init + idy * dst_stride,
+                 num_4x4_blocks_wide * 4);
+      } else {
+        // See similar comment above for highbd path.
+      }
+    next : {}
     }
-  next : {}
-  }
+    // *bestdistortion here should be the one that yielded best_rd.
+    if (best_rd >= rd_thresh || x->skip_encode) return best_rd;
 
-  if (best_rd >= rd_thresh || x->skip_encode) return best_rd;
+    for (idy = 0; idy < num_4x4_blocks_high * 4; ++idy)
+      memcpy(dst_init + idy * dst_stride, best_dst + idy * 8,
+             num_4x4_blocks_wide * 4);
 
-  for (idy = 0; idy < num_4x4_blocks_high * 4; ++idy)
-    memcpy(dst_init + idy * dst_stride, best_dst + idy * 8,
-           num_4x4_blocks_wide * 4);
-
-  return best_rd;
+    return best_rd;
 }
 
 static int64_t rd_pick_intra_sub_8x8_y_mode(VP9_COMP *cpi, MACROBLOCK *mb,
@@ -1356,6 +1399,11 @@ static int64_t rd_pick_intra_sub_8x8_y_mode(VP9_COMP *cpi, MACROBLOCK *mb,
   *distortion = total_distortion;
   mic->mode = mic->bmi[3].as_mode;
 
+  // Apply visual energy to the final distortion before RDCOST as it's a sum of (now weighted) sub-block distortions.
+  // Note: If sub-blocks' distortions were already weighted, this might be a double weighting.
+  // However, rd_pick_intra4x4block's bestdistortion output is now weighted.
+  // So, total_distortion is a sum of weighted distortions. We should NOT re-weight here.
+  // The previous thought was incorrect. total_distortion is already weighted.
   return RDCOST(mb->rdmult, mb->rddiv, cost, total_distortion);
 }
 
@@ -3222,6 +3270,31 @@ void vp9_rd_pick_intra_mode_sb(VP9_COMP *cpi, MACROBLOCK *x, RD_COST *rd_cost,
                                BLOCK_SIZE bsize, PICK_MODE_CONTEXT *ctx,
                                int64_t best_rd) {
   VP9_COMMON *const cm = &cpi->common;
+  MACROBLOCKD *const xd = &x->e_mbd; // For mi_row, mi_col access via xd->mi[0]
+
+  // Visual energy calculation for intra modes
+  x->visual_energy = 0; // Default to 0
+  if (cpi->visual_energy_map) {
+    const int block_w_pixels = block_size_wide[VISUAL_ENERGY_BLOCK_SIZE];
+    const int block_h_pixels = block_size_high[VISUAL_ENERGY_BLOCK_SIZE];
+    const int mi_row = xd->mi[0]->mi_row;
+    const int mi_col = xd->mi[0]->mi_col;
+    const int map_block_w_mi = block_w_pixels / MI_SIZE;
+    const int map_block_h_mi = block_h_pixels / MI_SIZE;
+
+    if (map_block_w_mi > 0 && map_block_h_mi > 0) {
+      const int map_col_idx = mi_col / map_block_w_mi;
+      const int map_row_idx = mi_row / map_block_h_mi;
+      const int map_width = (cm->width + block_w_pixels - 1) / block_w_pixels;
+      const int map_height = (cm->height + block_h_pixels - 1) / block_h_pixels;
+      const int map_size = map_width * map_height;
+      int map_idx = map_row_idx * map_width + map_col_idx;
+
+      if (map_idx >= 0 && map_idx < map_size) { // Bounds check
+        x->visual_energy = cpi->visual_energy_map[map_idx];
+      }
+    }
+  }
   MACROBLOCKD *const xd = &x->e_mbd;
   struct macroblockd_plane *const pd = xd->plane;
   int rate_y = 0, rate_uv = 0, rate_y_tokenonly = 0, rate_uv_tokenonly = 0;
@@ -3267,6 +3340,8 @@ void vp9_rd_pick_intra_mode_sb(VP9_COMP *cpi, MACROBLOCK *x, RD_COST *rd_cost,
 
   ctx->mic = *xd->mi[0];
   ctx->mbmi_ext = *x->mbmi_ext;
+  // Apply visual energy to the final distortion before calculating RD cost
+  rd_cost->dist = vp9_apply_visual_energy_weight(rd_cost->dist, x->visual_energy);
   rd_cost->rdcost = RDCOST(x->rdmult, x->rddiv, rd_cost->rate, rd_cost->dist);
 }
 
@@ -3447,6 +3522,27 @@ void vp9_rd_pick_inter_mode_sb(VP9_COMP *cpi, TileDataEnc *tile_data,
                                RD_COST *rd_cost, BLOCK_SIZE bsize,
                                PICK_MODE_CONTEXT *ctx, int64_t best_rd_so_far) {
   VP9_COMMON *const cm = &cpi->common;
+
+  // Visual energy calculation
+  x->visual_energy = 0; // Default to 0
+  if (cpi->visual_energy_map) {
+    const int block_w_pixels = block_size_wide[VISUAL_ENERGY_BLOCK_SIZE];
+    const int block_h_pixels = block_size_high[VISUAL_ENERGY_BLOCK_SIZE];
+    const int map_block_w_mi = block_w_pixels / MI_SIZE; // Width of energy block in MI units
+    const int map_block_h_mi = block_h_pixels / MI_SIZE; // Height of energy block in MI units
+
+    if (map_block_w_mi > 0 && map_block_h_mi > 0) { // Avoid division by zero if block size is smaller than MI_SIZE
+      const int map_col = mi_col / map_block_w_mi;
+      const int map_row = mi_row / map_block_h_mi;
+      const int map_width = (cm->width + block_w_pixels - 1) / block_w_pixels;
+      const int map_height = (cm->height + block_h_pixels - 1) / block_h_pixels;
+      const int map_size = map_width * map_height;
+      int map_idx = map_row * map_width + map_col;
+      if (map_idx >= 0 && map_idx < map_size) { // Bounds check
+        x->visual_energy = cpi->visual_energy_map[map_idx];
+      }
+    }
+  }
   TileInfo *const tile_info = &tile_data->tile_info;
   RD_OPT *const rd_opt = &cpi->rd;
   SPEED_FEATURES *const sf = &cpi->sf;
@@ -3926,6 +4022,10 @@ void vp9_rd_pick_inter_mode_sb(VP9_COMP *cpi, TileDataEnc *tile_data,
       }
 
       // Calculate the final RD estimate for this mode.
+      // Adjust distortion by visual energy
+      distortion2 = (int64_t)(distortion2 * (1.0 + x->visual_energy / 255.0));
+      // Adjust distortion by visual energy
+      distortion2 = (int64_t)(distortion2 * (1.0 + x->visual_energy / 255.0));
       this_rd = RDCOST(x->rdmult, x->rddiv, rate2, distortion2);
     }
 

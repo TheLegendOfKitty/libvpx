@@ -593,6 +593,13 @@ typedef struct vpx_codec_enc_cfg {
    */
   unsigned int rc_2pass_vbr_corpus_complexity;
 
+  /*!\brief Enable psychovisual rate distortion optimization
+   *
+   * TODO(user): Add more details.
+   * 0 = off (default), 1 = on
+   */
+  unsigned int enable_psy_rd;
+
   /*
    * keyframing settings (kf)
    */

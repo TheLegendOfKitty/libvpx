@@ -107,6 +107,7 @@ VP9_CX_SRCS-yes += encoder/vp9_temporal_filter.c
 VP9_CX_SRCS-yes += encoder/vp9_temporal_filter.h
 VP9_CX_SRCS-yes += encoder/vp9_tpl_model.c
 VP9_CX_SRCS-yes += encoder/vp9_tpl_model.h
+VP9_CX_SRCS-yes += encoder/vp9_visual_energy.c
 VP9_CX_SRCS-yes += encoder/vp9_mbgraph.c
 VP9_CX_SRCS-yes += encoder/vp9_mbgraph.h
 

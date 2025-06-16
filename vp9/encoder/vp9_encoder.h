@@ -680,6 +680,8 @@ typedef struct VP9_COMP {
 
   CODING_CONTEXT coding_context;
 
+  unsigned char *visual_energy_map; // Added for visual energy
+
   int *nmvcosts[2];
   int *nmvcosts_hp[2];
   int *nmvsadcosts[2];

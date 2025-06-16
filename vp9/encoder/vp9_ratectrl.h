@@ -215,6 +215,7 @@ typedef struct {
   // The index of the current GOP. Start from zero.
   // When a key frame is inserted, it resets to zero.
   int gop_global_index;
+  double avg_visual_energy; // Average visual energy for the current frame
 } RATE_CONTROL;
 
 struct VP9_COMP;

@@ -534,6 +534,9 @@ static const arg_def_t disable_loopfilter =
             "1: Loopfilter off for non reference frames\n"
             "                                          "
             "2: Loopfilter off for all frames");
+
+static const arg_def_t psy_rd_arg = ARG_DEF(
+    NULL, "psy-rd", 1, "Enable psychovisual rate distortion (0=off, 1=on, default=0)");
 #endif
 
 #if CONFIG_VP9_ENCODER
@@ -566,6 +569,7 @@ static const arg_def_t *vp9_args[] = { &cpu_used_vp9,
                                        &target_level,
                                        &row_mt,
                                        &disable_loopfilter,
+                                       &psy_rd_arg,
 // NOTE: The entries above have a corresponding entry in vp9_arg_ctrl_map. The
 // entries below do not have a corresponding entry in vp9_arg_ctrl_map. They
 // must be listed at the end of vp9_args.
@@ -1039,6 +1043,8 @@ static int parse_stream_params(struct VpxEncoderConfig *global,
       config->cfg.kf_max_dist = arg_parse_uint(&arg);
     } else if (arg_match(&arg, &kf_disabled, argi)) {
       config->cfg.kf_mode = VPX_KF_DISABLED;
+    } else if (arg_match(&arg, &psy_rd_arg, argi)) { // Added for psy-rd
+      config->cfg.enable_psy_rd = arg_parse_uint(&arg);
 #if CONFIG_VP9_ENCODER
     } else if (arg_match(&arg, &use_vizier_rc_params, argi)) {
       config->cfg.use_vizier_rc_params = arg_parse_int(&arg);

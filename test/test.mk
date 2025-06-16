@@ -195,6 +195,8 @@ LIBVPX_TEST_SRCS-$(CONFIG_VP9_ENCODER) += vp9_block_error_test.cc
 endif
 LIBVPX_TEST_SRCS-$(CONFIG_VP9_ENCODER) += vp9_quantize_test.cc
 LIBVPX_TEST_SRCS-$(CONFIG_VP9_ENCODER) += vp9_subtract_test.cc
+LIBVPX_TEST_SRCS-$(CONFIG_VP9_ENCODER) += test/vp9_visual_energy_test.cc
+LIBVPX_TEST_SRCS-$(CONFIG_VP9_ENCODER) += test/vp9_psy_rd_test.cc
 
 ifeq ($(CONFIG_VP9_ENCODER),yes)
 LIBVPX_TEST_SRCS-$(CONFIG_INTERNAL_STATS) += blockiness_test.cc
