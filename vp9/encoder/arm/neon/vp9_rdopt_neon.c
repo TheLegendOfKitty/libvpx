@@ -69,8 +69,8 @@ uint64_t vp9_block_diff_sse_neon(const uint8_t *src, int src_stride,
       uint16x8_t sq_lo = vmull_u8(diff_lo, diff_lo);
       uint16x8_t sq_hi = vmull_u8(diff_hi, diff_hi);
       
-      sse = vpadalq_u16(sse, sq_lo);
-      sse = vpadalq_u16(sse, sq_hi);
+      sse = vpadalq_u32(sse, vreinterpretq_u32_u16(sq_lo));
+      sse = vpadalq_u32(sse, vreinterpretq_u32_u16(sq_hi));
     }
     
     // Process 8 pixels at a time
@@ -79,7 +79,7 @@ uint64_t vp9_block_diff_sse_neon(const uint8_t *src, int src_stride,
       uint8x8_t pred_vec = vld1_u8(pred_row + j);
       uint8x8_t diff = vabd_u8(src_vec, pred_vec);
       uint16x8_t sq = vmull_u8(diff, diff);
-      sse = vpadalq_u16(sse, sq);
+      sse = vpadalq_u32(sse, vreinterpretq_u32_u16(sq));
     }
     
     // Handle remaining pixels

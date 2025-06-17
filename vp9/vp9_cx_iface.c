@@ -70,6 +70,8 @@ typedef struct vp9_extracfg {
   unsigned int row_mt;
   unsigned int motion_vector_unit_test;
   int delta_q_uv;
+  int use_psychovisual_rd;
+  double psy_rd_strength;
 } vp9_extracfg;
 
 static struct vp9_extracfg default_extra_cfg = {
@@ -110,6 +112,8 @@ static struct vp9_extracfg default_extra_cfg = {
   0,                     // row_mt
   0,                     // motion_vector_unit_test
   0,                     // delta_q_uv
+  0,                     // use_psychovisual_rd
+  0.0,                   // psy_rd_strength
 };
 
 struct vpx_codec_alg_priv {
@@ -647,6 +651,14 @@ static vpx_codec_err_t set_encoder_config(
   oxcf->motion_vector_unit_test = extra_cfg->motion_vector_unit_test;
 
   oxcf->delta_q_uv = extra_cfg->delta_q_uv;
+
+  oxcf->use_psychovisual_rd = cfg->use_psychovisual_rd;
+  if (cfg->psy_rd_strength.den != 0) {
+    oxcf->psy_rd_strength =
+        (double)cfg->psy_rd_strength.num / (double)cfg->psy_rd_strength.den;
+  } else {
+    oxcf->psy_rd_strength = 0.0;
+  }
 
   for (sl = 0; sl < oxcf->ss_number_layers; ++sl) {
     for (tl = 0; tl < oxcf->ts_number_layers; ++tl) {
@@ -2259,6 +2271,8 @@ static vpx_codec_enc_cfg_map_t encoder_usage_cfg_map[] = {
         { 1, 1 },  // rd_mult_inter_qp_fac
         { 1, 1 },  // rd_mult_arf_qp_fac
         { 1, 1 },  // rd_mult_key_qp_fac
+        0,         // use_psychovisual_rd
+        { 0, 1 },  // psy_rd_strength
     } },
 };
 

@@ -285,6 +285,9 @@ typedef struct VP9EncoderConfig {
   int row_mt;
   unsigned int motion_vector_unit_test;
   int delta_q_uv;
+
+  int use_psychovisual_rd;
+  double psy_rd_strength;
 } VP9EncoderConfig;
 
 static INLINE int is_lossless_requested(const VP9EncoderConfig *cfg) {
@@ -911,6 +914,9 @@ typedef struct VP9_COMP {
 
   // Flag to disable scene detection when rtc rate control library is used.
   int disable_scene_detection_rtc_ratectrl;
+
+  int use_psychovisual_rd;
+  double psy_rd_strength;
 
 #if CONFIG_COLLECT_COMPONENT_TIMING
   /*!

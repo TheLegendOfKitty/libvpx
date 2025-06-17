@@ -39,6 +39,7 @@
 #include "vp9/encoder/vp9_ratectrl.h"
 #include "vp9/encoder/vp9_rd.h"
 #include "vp9/encoder/vp9_tokenize.h"
+#include "vpx_dsp/psy_rd.h"
 
 #define RD_THRESH_POW 1.25
 
@@ -81,13 +82,26 @@ void vp9_rd_cost_update(int mult, int div, RD_COST *rd_cost) {
   }
 }
 
-// The baseline rd thresholds for breaking out of the rd loop for
-// certain modes are assumed to be based on 8x8 blocks.
-// This table is used to correct for block size.
-// The factors here are << 2 (2 = x0.5, 32 = x8 etc).
-static const uint8_t rd_thresh_block_size_factor[BLOCK_SIZES] = {
-  2, 3, 3, 4, 6, 6, 8, 12, 12, 16, 24, 24, 32
-};
+int64_t vp9_psychovisual_distortion(const struct VP9_COMP *cpi,
+                                    struct macroblock *x, int plane,
+                                    int blk_row, int blk_col, TX_SIZE tx_size) {
+  MACROBLOCKD *const xd = &x->e_mbd;
+  const struct macroblock_plane *const p = &x->plane[plane];
+  const struct macroblockd_plane *const pd = &xd->plane[plane];
+  const BLOCK_SIZE tx_bsize = txsize_to_bsize[tx_size];
+  const int src_stride = p->src.stride;
+  const int dst_stride = pd->dst.stride;
+  const int src_idx = 4 * (blk_row * src_stride + blk_col);
+  const int dst_idx = 4 * (blk_row * dst_stride + blk_col);
+  const uint8_t *src = &p->src.buf[src_idx];
+  const uint8_t *dst = &pd->dst.buf[dst_idx];
+  const int w = 4 * num_4x4_blocks_wide_lookup[tx_bsize];
+  const int h = 4 * num_4x4_blocks_high_lookup[tx_bsize];
+  const int is_hbd = (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH);
+
+  return vp9_get_psy_full_dist(src, 0, src_stride, dst, 0, dst_stride, w, h,
+                               is_hbd, cpi->psy_rd_strength / 100.0);
+}
 
 static void fill_mode_costs(VP9_COMP *cpi) {
   const FRAME_CONTEXT *const fc = cpi->common.fc;
@@ -354,6 +368,13 @@ void vp9_initialize_me_consts(VP9_COMP *cpi, MACROBLOCK *x, int qindex) {
 
 static void set_block_thresholds(const VP9_COMMON *cm, RD_OPT *rd) {
   int i, bsize, segment_id;
+  // The baseline rd thresholds for breaking out of the rd loop for
+  // certain modes are assumed to be based on 8x8 blocks.
+  // This table is used to correct for block size.
+  // The factors here are << 2 (2 = x0.5, 32 = x8 etc).
+  const uint8_t rd_thresh_block_size_factor[BLOCK_SIZES] = {
+    2, 3, 3, 4, 6, 6, 8, 12, 12, 16, 24, 24, 32
+  };
 
   for (segment_id = 0; segment_id < MAX_SEGMENTS; ++segment_id) {
     const int qindex =

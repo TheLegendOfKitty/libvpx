@@ -846,6 +846,9 @@ typedef struct vpx_codec_enc_cfg {
    *
    */
   vpx_rational_t rd_mult_key_qp_fac;
+
+  int use_psychovisual_rd;
+  vpx_rational_t psy_rd_strength;
 } vpx_codec_enc_cfg_t; /**< alias for struct vpx_codec_enc_cfg */
 
 /*!\brief  vp9 svc extra configure parameters

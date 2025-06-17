@@ -18,6 +18,7 @@
 #include "vp9/encoder/vp9_block.h"
 #include "vp9/encoder/vp9_context_tree.h"
 #include "vp9/encoder/vp9_cost.h"
+#include "vp9/encoder/psy_rd.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -227,6 +228,10 @@ unsigned int vp9_high_get_sby_perpixel_variance(struct VP9_COMP *cpi,
 #endif
 
 void vp9_build_inter_mode_cost(struct VP9_COMP *cpi);
+
+int64_t vp9_psychovisual_distortion(const struct VP9_COMP *cpi,
+                                    struct macroblock *x, int plane,
+                                    int blk_row, int blk_col, TX_SIZE tx_size);
 
 #ifdef __cplusplus
 }  // extern "C"

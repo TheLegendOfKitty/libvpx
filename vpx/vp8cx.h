@@ -776,6 +776,24 @@ enum vp8e_enc_control_id {
    * 1. The default value is set to be 0.
    */
   VP9E_SET_KEY_FRAME_FILTERING,
+
+  /*!\brief Codec control function to enable psychovisual rate distortion
+   * optimization.
+   *
+   * 0: off (default), 1: on
+   *
+   * Supported in codecs: VP9
+   */
+  VP9E_SET_ENABLE_PSYCHOVISUAL_RD,
+
+  /*!\brief Codec control function to set strength of psychovisual rate
+   * distortion optimization.
+   *
+   * Valid range: 0.0..8.0
+   *
+   * Supported in codecs: VP9
+   */
+  VP9E_SET_PSY_RD_STRENGTH,
 };
 
 /*!\brief vpx 1-D scaling mode

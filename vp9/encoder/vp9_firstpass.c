@@ -44,6 +44,13 @@
 #include "vpx/vpx_codec.h"
 #include "vpx/vpx_ext_ratectrl.h"
 #include "vpx_dsp/variance.h"
+#include "vp9/encoder/vp9_encoder.h"
+
+// Resets the first pass file to the given position using a relative seek from
+// the current position.
+static void reset_fpf_position(TWO_PASS *p, const FIRSTPASS_STATS *position) {
+  p->stats_in = position;
+}
 
 #define OUTPUT_FPF 0
 #define ARF_STATS_OUTPUT 0
@@ -90,11 +97,6 @@
 unsigned int arf_count = 0;
 #endif
 
-// Resets the first pass file to the given position using a relative seek from
-// the current position.
-static void reset_fpf_position(TWO_PASS *p, const FIRSTPASS_STATS *position) {
-  p->stats_in = position;
-}
 
 // Read frame stats at an offset from the current position.
 static const FIRSTPASS_STATS *read_frame_stats(const TWO_PASS *p, int offset) {

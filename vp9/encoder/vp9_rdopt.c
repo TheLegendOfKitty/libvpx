@@ -688,6 +688,10 @@ static void dist_block(const VP9_COMP *cpi, MACROBLOCK *x, int plane,
 
     *out_dist = (int64_t)tmp * 16;
   }
+  if (cpi->use_psychovisual_rd) {
+    *out_dist = vp9_psychovisual_distortion(cpi, x, plane, blk_row, blk_col,
+                                            tx_size);
+  }
 }
 
 static int rate_block(int plane, int block, TX_SIZE tx_size, int coeff_ctx,
@@ -817,7 +821,11 @@ static void block_rd_txfm(int plane, int block, int blk_row, int blk_col,
     }
   }
 
-  rd = RDCOST(x->rdmult, x->rddiv, 0, dist);
+  if (args->cpi->use_psychovisual_rd) {
+    rd = RDCOST(x->rdmult, x->rddiv, 0, dist);
+  } else {
+    rd = RDCOST(x->rdmult, x->rddiv, 0, sse);
+  }
   if (args->this_rd + rd > args->best_rd) {
     args->exit_early = 1;
     return;
@@ -827,10 +835,12 @@ static void block_rd_txfm(int plane, int block, int blk_row, int blk_col,
   args->t_above[blk_col] = (x->plane[plane].eobs[block] > 0) ? 1 : 0;
   args->t_left[blk_row] = (x->plane[plane].eobs[block] > 0) ? 1 : 0;
   rd1 = RDCOST(x->rdmult, x->rddiv, rate, dist);
-  rd2 = RDCOST(x->rdmult, x->rddiv, 0, sse);
-
-  // TODO(jingning): temporarily enabled only for luma component
-  rd = VPXMIN(rd1, rd2);
+  if (args->cpi->use_psychovisual_rd) {
+    rd = rd1;
+  } else {
+    rd2 = RDCOST(x->rdmult, x->rddiv, 0, sse);
+    rd = VPXMIN(rd1, rd2);
+  }
   if (plane == 0) {
     x->zcoeff_blk[tx_size][block] =
         !x->plane[plane].eobs[block] ||
