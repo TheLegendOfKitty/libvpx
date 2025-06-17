@@ -285,9 +285,9 @@ typedef struct VP9EncoderConfig {
   int row_mt;
   unsigned int motion_vector_unit_test;
   int delta_q_uv;
-
   int use_psychovisual_rd;
   double psy_rd_strength;
+  int psy_bitrate_bias;
 } VP9EncoderConfig;
 
 static INLINE int is_lossless_requested(const VP9EncoderConfig *cfg) {
@@ -917,6 +917,7 @@ typedef struct VP9_COMP {
 
   int use_psychovisual_rd;
   double psy_rd_strength;
+  int psy_bitrate_bias;
 
 #if CONFIG_COLLECT_COMPONENT_TIMING
   /*!

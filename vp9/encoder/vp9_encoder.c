@@ -2095,8 +2095,12 @@ void vp9_change_config(struct VP9_COMP *cpi, const VP9EncoderConfig *oxcf) {
   set_level_constraint(&cpi->level_constraint,
                        get_level_index(cpi->target_level));
 
+  cpi->rd_ctrl.use_psychovisual_rd = oxcf->use_psychovisual_rd;
+  cpi->rd_ctrl.psy_rd_strength = oxcf->psy_rd_strength;
   cpi->use_psychovisual_rd = oxcf->use_psychovisual_rd;
   cpi->psy_rd_strength = oxcf->psy_rd_strength;
+  cpi->oxcf.psy_bitrate_bias = oxcf->psy_bitrate_bias;
+  cpi->psy_bitrate_bias = oxcf->psy_bitrate_bias;
 
   if (cm->profile <= PROFILE_1)
     assert(cm->bit_depth == VPX_BITS_8);

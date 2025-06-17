@@ -840,7 +840,7 @@ typedef struct vpx_codec_enc_cfg {
   /*!\brief Rate-distortion multiplier for key frames.
    * The multiplier is a crucial parameter in the calculation of rate distortion
    * cost. It is often related to the qp (qindex) value.
-   * Rate control parameters, could be set from external experiment results.
+   * Rate control parameters, set from external experiment results.
    * Only when |use_vizier_rc_params| is set to 1, the pass in value will be
    * used. Otherwise, the default value is used.
    *
@@ -849,6 +849,7 @@ typedef struct vpx_codec_enc_cfg {
 
   int use_psychovisual_rd;
   vpx_rational_t psy_rd_strength;
+  vpx_rational_t psy_bitrate_bias;
 } vpx_codec_enc_cfg_t; /**< alias for struct vpx_codec_enc_cfg */
 
 /*!\brief  vp9 svc extra configure parameters

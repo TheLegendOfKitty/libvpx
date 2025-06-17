@@ -91,6 +91,9 @@ static INLINE int saturate_cast_double_to_int(double d) {
 
 #ifdef __cplusplus
 }  // extern "C"
-#endif
 
+int64_t vpx_highbd_sse(const uint8_t *a8, int a_stride, const uint8_t *b8,
+                       int b_stride, int width, int height);
+
+#endif
 #endif  // VPX_VPX_DSP_VPX_DSP_COMMON_H_

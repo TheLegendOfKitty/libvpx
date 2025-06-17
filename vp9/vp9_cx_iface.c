@@ -71,7 +71,8 @@ typedef struct vp9_extracfg {
   unsigned int motion_vector_unit_test;
   int delta_q_uv;
   int use_psychovisual_rd;
-  double psy_rd_strength;
+  vpx_rational_t psy_rd_strength;
+  vpx_rational_t psy_bitrate_bias;
 } vp9_extracfg;
 
 static struct vp9_extracfg default_extra_cfg = {
@@ -113,7 +114,8 @@ static struct vp9_extracfg default_extra_cfg = {
   0,                     // motion_vector_unit_test
   0,                     // delta_q_uv
   0,                     // use_psychovisual_rd
-  0.0,                   // psy_rd_strength
+  { 0, 1 },              // psy_rd_strength
+  { 0, 1 },              // psy_bitrate_bias
 };
 
 struct vpx_codec_alg_priv {
@@ -652,13 +654,11 @@ static vpx_codec_err_t set_encoder_config(
 
   oxcf->delta_q_uv = extra_cfg->delta_q_uv;
 
-  oxcf->use_psychovisual_rd = cfg->use_psychovisual_rd;
-  if (cfg->psy_rd_strength.den != 0) {
-    oxcf->psy_rd_strength =
-        (double)cfg->psy_rd_strength.num / (double)cfg->psy_rd_strength.den;
-  } else {
-    oxcf->psy_rd_strength = 0.0;
-  }
+  oxcf->use_psychovisual_rd = extra_cfg->use_psychovisual_rd;
+  oxcf->psy_rd_strength =
+      (double)extra_cfg->psy_rd_strength.num / extra_cfg->psy_rd_strength.den;
+  oxcf->psy_bitrate_bias = (int)((double)extra_cfg->psy_bitrate_bias.num /
+                                 extra_cfg->psy_bitrate_bias.den);
 
   for (sl = 0; sl < oxcf->ss_number_layers; ++sl) {
     for (tl = 0; tl < oxcf->ts_number_layers; ++tl) {
@@ -2105,6 +2105,31 @@ static vpx_codec_err_t ctrl_set_external_rate_control(vpx_codec_alg_priv_t *ctx,
   return VPX_CODEC_OK;
 }
 
+static vpx_codec_err_t ctrl_set_enable_psychovisual_rd(
+    vpx_codec_alg_priv_t *ctx, va_list args) {
+  struct vp9_extracfg extra_cfg = ctx->extra_cfg;
+  extra_cfg.use_psychovisual_rd = CAST(VP9E_SET_ENABLE_PSYCHOVISUAL_RD, args);
+  return update_extra_cfg(ctx, &extra_cfg);
+}
+
+static vpx_codec_err_t ctrl_set_psy_rd_strength(vpx_codec_alg_priv_t *ctx,
+                                                va_list args) {
+  struct vp9_extracfg extra_cfg = ctx->extra_cfg;
+  double val = va_arg(args, double);
+  extra_cfg.psy_rd_strength.num = (int)(val * 256);
+  extra_cfg.psy_rd_strength.den = 256;
+  return update_extra_cfg(ctx, &extra_cfg);
+}
+
+static vpx_codec_err_t ctrl_set_psy_bitrate_bias(vpx_codec_alg_priv_t *ctx,
+                                                 va_list args) {
+  struct vp9_extracfg extra_cfg = ctx->extra_cfg;
+  double val = va_arg(args, double);
+  extra_cfg.psy_bitrate_bias.num = (int)(val * 100);
+  extra_cfg.psy_bitrate_bias.den = 100;
+  return update_extra_cfg(ctx, &extra_cfg);
+}
+
 static vpx_codec_err_t ctrl_set_quantizer_one_pass(vpx_codec_alg_priv_t *ctx,
                                                    va_list args) {
   VP9_COMP *const cpi = ctx->cpi;
@@ -2175,6 +2200,9 @@ static vpx_codec_ctrl_fn_map_t encoder_ctrl_maps[] = {
   { VP9E_SET_SVC_GF_TEMPORAL_REF, ctrl_set_svc_gf_temporal_ref },
   { VP9E_SET_SVC_SPATIAL_LAYER_SYNC, ctrl_set_svc_spatial_layer_sync },
   { VP9E_SET_DELTA_Q_UV, ctrl_set_delta_q_uv },
+  { VP9E_SET_ENABLE_PSYCHOVISUAL_RD, ctrl_set_enable_psychovisual_rd },
+  { VP9E_SET_PSY_RD_STRENGTH, ctrl_set_psy_rd_strength },
+  { VP9E_SET_PSY_BITRATE_BIAS, ctrl_set_psy_bitrate_bias },
   { VP9E_SET_DISABLE_LOOPFILTER, ctrl_set_disable_loopfilter },
   { VP9E_SET_RTC_EXTERNAL_RATECTRL, ctrl_set_rtc_external_ratectrl },
   { VP9E_SET_EXTERNAL_RATE_CONTROL, ctrl_set_external_rate_control },
@@ -2273,6 +2301,7 @@ static vpx_codec_enc_cfg_map_t encoder_usage_cfg_map[] = {
         { 1, 1 },  // rd_mult_key_qp_fac
         0,         // use_psychovisual_rd
         { 0, 1 },  // psy_rd_strength
+        { 0, 1 },  // psy_bitrate_bias
     } },
 };
 

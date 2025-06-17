@@ -107,6 +107,8 @@ typedef struct {
   double rd_mult_inter_qp_fac;
   double rd_mult_arf_qp_fac;
   double rd_mult_key_qp_fac;
+  int use_psychovisual_rd;
+  double psy_rd_strength;
 } RD_CONTROL;
 
 typedef struct RD_OPT {

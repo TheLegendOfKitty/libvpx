@@ -28,6 +28,9 @@
 #include "vp9/common/vp9_quant_common.h"
 #include "vp9/common/vp9_reconinter.h"
 #include "vp9/common/vp9_reconintra.h"
+#include "vp9/common/vp9_blockd.h"
+#include "vp9/encoder/vp9_psy.h"
+#include "./vp9_rtcd.h"
 #include "vp9/common/vp9_scan.h"
 #include "vp9/common/vp9_seg_common.h"
 
@@ -688,9 +691,19 @@ static void dist_block(const VP9_COMP *cpi, MACROBLOCK *x, int plane,
 
     *out_dist = (int64_t)tmp * 16;
   }
-  if (cpi->use_psychovisual_rd) {
-    *out_dist = vp9_psychovisual_distortion(cpi, x, plane, blk_row, blk_col,
-                                            tx_size);
+  if (cpi->oxcf.use_psychovisual_rd) {
+    const BLOCK_SIZE tx_bsize = txsize_to_bsize[tx_size];
+    const int tx_w = num_4x4_blocks_wide_lookup[tx_bsize] * 4;
+    const int tx_h = num_4x4_blocks_high_lookup[tx_bsize] * 4;
+    const int src_stride = p->src.stride;
+    const uint8_t *src = &p->src.buf[4 * (blk_row * src_stride + blk_col)];
+    const int dst_stride = pd->dst.stride;
+    const uint8_t *dst = &pd->dst.buf[4 * (blk_row * dst_stride + blk_col)];
+    const int use_hbd = xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH;
+    const double psy_strength = cpi->oxcf.psy_rd_strength;
+    *out_dist = vp9_psy_rd_dist(src, src_stride, dst, dst_stride, tx_w, tx_h,
+                                use_hbd, psy_strength,
+                                (double)cpi->psy_bitrate_bias);
   }
 }
 

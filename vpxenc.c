@@ -543,6 +543,10 @@ static const arg_def_t enable_psychovisual_rd =
 static const arg_def_t psy_rd_strength = ARG_DEF(
     NULL, "psy-rd-strength", 1,
     "Strength of psychovisual rate distortion optimization (0-800)");
+
+static const arg_def_t psy_bitrate_bias = ARG_DEF(
+    NULL, "psy-bitrate-bias", 1,
+    "Bitrate bias for psychovisual rate distortion optimization (0-100)");
 #endif
 
 #if CONFIG_VP9_ENCODER
@@ -576,6 +580,8 @@ static const arg_def_t *vp9_args[] = { &cpu_used_vp9,
                                        &row_mt,
                                        &disable_loopfilter,
                                        &enable_psychovisual_rd,
+                                       &psy_rd_strength,
+                                       &psy_bitrate_bias,
 // NOTE: The entries above have a corresponding entry in vp9_arg_ctrl_map. The
 // entries below do not have a corresponding entry in vp9_arg_ctrl_map. They
 // must be listed at the end of vp9_args.
@@ -614,6 +620,8 @@ static const int vp9_arg_ctrl_map[] = { VP8E_SET_CPUUSED,
                                         VP9E_SET_ROW_MT,
                                         VP9E_SET_DISABLE_LOOPFILTER,
                                         VP9E_SET_ENABLE_PSYCHOVISUAL_RD,
+                                        VP9E_SET_PSY_RD_STRENGTH,
+                                        VP9E_SET_PSY_BITRATE_BIAS,
                                         0 };
 #endif
 
@@ -1058,6 +1066,8 @@ static int parse_stream_params(struct VpxEncoderConfig *global,
       config->cfg.use_psychovisual_rd = arg_parse_uint(&arg);
     } else if (arg_match(&arg, &psy_rd_strength, argi)) {
       config->cfg.psy_rd_strength = arg_parse_rational(&arg);
+    } else if (arg_match(&arg, &psy_bitrate_bias, argi)) {
+      config->cfg.psy_bitrate_bias = arg_parse_rational(&arg);
 #if CONFIG_VP9_ENCODER
     } else if (arg_match(&arg, &use_vizier_rc_params, argi)) {
       config->cfg.use_vizier_rc_params = arg_parse_int(&arg);

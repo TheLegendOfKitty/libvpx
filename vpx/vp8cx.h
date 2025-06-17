@@ -794,6 +794,15 @@ enum vp8e_enc_control_id {
    * Supported in codecs: VP9
    */
   VP9E_SET_PSY_RD_STRENGTH,
+
+  /*!\brief Codec control function to set bitrate bias for psychovisual rate
+   * distortion optimization.
+   *
+   * Valid range: 0..100
+   *
+   * Supported in codecs: VP9
+   */
+  VP9E_SET_PSY_BITRATE_BIAS,
 };
 
 /*!\brief vpx 1-D scaling mode
@@ -1126,6 +1135,12 @@ VPX_CTRL_USE_TYPE(VP9E_SET_QUANTIZER_ONE_PASS, int)
 #define VPX_CTRL_VP9E_SET_QUANTIZER_ONE_PASS
 VPX_CTRL_USE_TYPE(VP9E_SET_KEY_FRAME_FILTERING, int)
 #define VPX_CTRL_VP9E_SET_KEY_FRAME_FILTERING
+VPX_CTRL_USE_TYPE(VP9E_SET_ENABLE_PSYCHOVISUAL_RD, unsigned int)
+#define VPX_CTRL_VP9E_SET_ENABLE_PSYCHOVISUAL_RD
+VPX_CTRL_USE_TYPE(VP9E_SET_PSY_RD_STRENGTH, double)
+#define VPX_CTRL_VP9E_SET_PSY_RD_STRENGTH
+VPX_CTRL_USE_TYPE(VP9E_SET_PSY_BITRATE_BIAS, double)
+#define VPX_CTRL_VP9E_SET_PSY_BITRATE_BIAS
 
 /*!\endcond */
 /*! @} - end defgroup vp8_encoder */
